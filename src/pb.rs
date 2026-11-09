@@ -18,7 +18,7 @@ pub struct AuthStoreRecord {
     pub email: String,
     pub email_visibility: bool,
     pub verified: bool,
-    pub name: String,
+    pub name: Option<String>,
 }
 #[derive(Default, Serialize, Deserialize, Clone, Debug)]
 pub struct AuthStore {
@@ -67,7 +67,7 @@ impl Pocketbase {
                 Ok(result) => {
                     return Ok(result);
                 }
-                Err(e) => {
+                Err(_e) => {
                     return Err(PbErr::ParseFail);
                 }
             }
@@ -94,12 +94,10 @@ impl Pocketbase {
                 Ok(result) => {
                     return Ok(result);
                 }
-                Err(e) => {
+                Err(_e) => {
                     return Err(PbErr::ParseFail);
                 }
             }
-        } else if let Err(e) = response {
-            println!("{}", e);
         }
         Err(PbErr::RequestFail)
     }
@@ -122,12 +120,10 @@ impl Pocketbase {
                 Ok(result) => {
                     return Ok(result);
                 }
-                Err(e) => {
+                Err(_e) => {
                     return Err(PbErr::ParseFail);
                 }
             }
-        } else if let Err(e) = response {
-            println!("{}", e);
         }
         Err(PbErr::RequestFail)
     }
@@ -189,17 +185,36 @@ pub struct ListParams {
 }
 
 impl ListParams {
-    pub fn new(
-        filter: Option<&str>,
-        sort: Option<&str>,
-        expand: Option<&str>,
-        fields: Option<&str>,
-    ) -> ListParams {
+    pub fn new() -> ListParams {
         Self {
-            filter: filter.map(str::to_string),
-            sort: sort.map(str::to_string),
-            expand: expand.map(str::to_string),
-            fields: fields.map(str::to_string),
+            filter: None,
+            sort: None,
+            expand: None,
+            fields: None,
+        }
+    }
+    pub fn filter(&self, s: &str) -> Self {
+        Self {
+            filter: Some(s.to_string()),
+            ..self.clone()
+        }
+    }
+    pub fn sort(&mut self, s: &str) -> Self {
+        Self {
+            sort: Some(s.to_string()),
+            ..self.clone()
+        }
+    }
+    pub fn expand(&mut self, s: &str) -> Self {
+        Self {
+            expand: Some(s.to_string()),
+            ..self.clone()
+        }
+    }
+    pub fn fields(&mut self, s: &str) -> Self {
+        Self {
+            fields: Some(s.to_string()),
+            ..self.clone()
         }
     }
 }
@@ -208,7 +223,7 @@ impl Pocketbase {
     pub async fn full_list<T: for<'a> Deserialize<'a>>(
         &self,
         collection: &str,
-        params: Option<ListParams>,
+        params: Option<&ListParams>,
     ) -> Vec<T> {
         let mut result: Vec<T> = vec![];
         let batch_size: usize = 1000;
@@ -216,7 +231,7 @@ impl Pocketbase {
         let mut done = false;
         while !done {
             let record = self
-                .list(collection, page, batch_size, params.clone())
+                .list(collection, page, batch_size, params)
                 .await
                 .unwrap();
             if record.items.len() < record.per_page {
@@ -230,11 +245,11 @@ impl Pocketbase {
     pub async fn get_first_list_item<T: for<'a> Deserialize<'a> + Clone>(
         &self,
         collection: &str,
-        params: Option<ListParams>,
+        params: Option<&ListParams>,
     ) -> Option<T> {
         let list: Result<Records<T>, PbErr> = self.list(collection, 1, 1, params).await;
         if let Ok(l) = list
-            && l.items.len() > 0
+            && !l.items.is_empty()
         {
             return Some(l.items[0].clone());
         }
@@ -245,24 +260,24 @@ impl Pocketbase {
         collection: &str,
         page: usize,
         per_page: usize,
-        params: Option<ListParams>,
+        params: Option<&ListParams>,
     ) -> Result<Records<T>, PbErr> {
         let mut p: Vec<(&str, String)> = vec![
             ("page", page.to_string()),
             ("perPage", per_page.to_string()),
         ];
         if let Some(params) = params {
-            if let Some(f) = params.filter {
-                p.push(("filter", f));
+            if let Some(ref f) = params.filter {
+                p.push(("filter", f.to_string()));
             }
-            if let Some(s) = params.sort {
-                p.push(("sort", s));
+            if let Some(ref s) = params.sort {
+                p.push(("sort", s.to_string()));
             }
-            if let Some(e) = params.expand {
-                p.push(("expand", e));
+            if let Some(ref e) = params.expand {
+                p.push(("expand", e.to_string()));
             }
-            if let Some(f) = params.fields {
-                p.push(("fields", f));
+            if let Some(ref f) = params.fields {
+                p.push(("fields", f.to_string()));
             }
         }
         let path = format!("/api/collections/{}/records", collection);
