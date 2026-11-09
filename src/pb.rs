@@ -20,6 +20,7 @@ pub struct AuthStoreRecord {
     pub verified: bool,
     pub name: Option<String>,
 }
+
 #[derive(Default, Serialize, Deserialize, Clone, Debug)]
 pub struct AuthStore {
     pub token: String,
@@ -127,7 +128,7 @@ impl Pocketbase {
         }
         Err(PbErr::RequestFail)
     }
-    pub async fn delete<T: for<'a> Deserialize<'a>>(&self, path: &str) -> Result<T, PbErr> {
+    pub async fn delete(&self, path: &str) -> Result<(), PbErr> {
         let url: String = format!("{}/{}", self.addr, path);
         let response = self
             .client
@@ -135,10 +136,8 @@ impl Pocketbase {
             .bearer_auth(&self.auth_store.token)
             .send()
             .await;
-        if let Ok(body) = response
-            && let Ok(result) = body.json::<T>().await
-        {
-            return Ok(result);
+        if let Ok(body) = response {
+            return Ok(());
         }
         Err(PbErr::RequestFail)
     }
@@ -283,4 +282,40 @@ impl Pocketbase {
         let path = format!("/api/collections/{}/records", collection);
         self.get(&path, &p).await
     }
+    pub async fn view<T: for<'a> Deserialize<'a>>(
+        &self,
+        collection: &str,
+        id: &str,
+    ) -> Result<T, PbErr> {
+        let p: Vec<(&str, String)> = vec![];
+        let path = format!("/api/collections/{}/records/{}", collection, id);
+        self.get(&path, &p).await
+    }
+    pub async fn create<T: for<'a> Deserialize<'a> + Serialize>(
+        &self,
+        collection: &str,
+        body: T,
+    ) -> Result<T, PbErr> {
+        let path = format!("/api/collections/{}/records", collection);
+        self.post(&path, &body).await
+    }
+    pub async fn update<T: for<'a> Deserialize<'a> + Serialize>(
+        &self,
+        collection: &str,
+        id: &str,
+        body: T,
+    ) -> Result<T, PbErr> {
+        let path = format!("/api/collections/{}/records/{}", collection, id);
+        self.patch(&path, &body).await
+    }
+    pub async fn remove(
+        &self,
+        collection: &str,
+        id: &str,
+    ) {
+        let path = format!("/api/collections/{}/records/{}", collection, id);
+        self.delete(&path).await;
+    }
+
+
 }
