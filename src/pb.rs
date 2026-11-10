@@ -1,4 +1,5 @@
-use reqwest::Client;
+use gloo_net::http::Request;
+use implicit_clone::ImplicitClone;
 use serde::{Deserialize, Serialize};
 use std::vec::Vec;
 
@@ -9,7 +10,7 @@ pub enum PbErr {
     RequestFail,
 }
 
-#[derive(Default, Serialize, Deserialize, Clone, Debug)]
+#[derive(Default, Serialize, Deserialize, Clone, Debug, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct AuthStoreRecord {
     pub collection_id: String,
@@ -21,16 +22,16 @@ pub struct AuthStoreRecord {
     pub name: Option<String>,
 }
 
-#[derive(Default, Serialize, Deserialize, Clone, Debug)]
+#[derive(Default, Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct AuthStore {
     pub token: String,
     pub record: AuthStoreRecord,
 }
 
-#[derive(Default)]
+#[derive(Default, PartialEq, Clone, ImplicitClone)]
 pub struct Pocketbase {
     addr: String,
-    client: Client,
+    //client: Client,
     pub auth_store: AuthStore,
 }
 #[derive(Default, Serialize, Deserialize)]
@@ -49,18 +50,17 @@ pub struct Records<T> {
     pub items: Vec<T>,
 }
 
+// Implementation of basic API methods
 impl Pocketbase {
     pub async fn get<T: for<'a> Deserialize<'a>>(
         &self,
         path: &str,
-        params: &(impl Serialize + ?Sized),
+        params: Vec<(&str, &str)>,
     ) -> Result<T, PbErr> {
         let url: String = format!("{}/{}", self.addr, path);
-        let response = self
-            .client
-            .get(url)
+        let response = Request::get(&url)
             .query(params)
-            .bearer_auth(&self.auth_store.token)
+            .header("Authorization", &self.auth_store.token)
             .send()
             .await;
         if let Ok(body) = response {
@@ -82,11 +82,10 @@ impl Pocketbase {
         body: &impl Serialize,
     ) -> Result<T, PbErr> {
         let url: String = format!("{}/{}", self.addr, path);
-        let response = self
-            .client
-            .post(url)
-            .bearer_auth(&self.auth_store.token)
+        let response = Request::post(&url)
+            .header("Authorization", &self.auth_store.token)
             .json(body)
+            .unwrap()
             .send()
             .await;
 
@@ -109,11 +108,10 @@ impl Pocketbase {
         body: &impl Serialize,
     ) -> Result<T, PbErr> {
         let url: String = format!("{}/{}", self.addr, path);
-        let response = self
-            .client
-            .patch(url)
+        let response = Request::patch(&url)
+            .header("Authorization", &self.auth_store.token)
             .json(body)
-            .bearer_auth(&self.auth_store.token)
+            .unwrap()
             .send()
             .await;
         if let Ok(body) = response {
@@ -130,13 +128,11 @@ impl Pocketbase {
     }
     pub async fn delete(&self, path: &str) -> Result<(), PbErr> {
         let url: String = format!("{}/{}", self.addr, path);
-        let response = self
-            .client
-            .delete(url)
-            .bearer_auth(&self.auth_store.token)
+        let response = Request::delete(&url)
+            .header("Authorization", &self.auth_store.token)
             .send()
             .await;
-        if let Ok(body) = response {
+        if response.is_ok() {
             return Ok(());
         }
         Err(PbErr::RequestFail)
@@ -147,19 +143,20 @@ impl Pocketbase {
     pub fn new(addr: &str) -> Pocketbase {
         Self {
             addr: addr.to_string(),
-            client: Client::new(),
+            //client: Client::new(),
             auth_store: Default::default(),
         }
     }
 }
 
+// Implementation of auth methods
 impl Pocketbase {
     pub async fn auth_with_password(
-        &mut self,
+        self,
         collection: &str,
         identity: &str,
         password: &str,
-    ) -> Option<String> {
+    ) -> Self {
         let body = PasswordCred {
             identity: identity.to_string(),
             password: password.to_string(),
@@ -167,10 +164,9 @@ impl Pocketbase {
         let path = format!("/api/collections/{}/auth-with-password", collection);
         let response = self.post::<AuthStore>(&path, &body).await;
         if let Ok(new_auth) = response {
-            self.auth_store = new_auth;
-            Some(self.auth_store.record.id.clone())
+            Self { auth_store : new_auth, ..Default::default()}
         } else {
-            None
+            self
         }
     }
 }
@@ -217,7 +213,7 @@ impl ListParams {
         }
     }
 }
-
+// Implementation of CRUD methods
 impl Pocketbase {
     pub async fn full_list<T: for<'a> Deserialize<'a>>(
         &self,
@@ -261,35 +257,33 @@ impl Pocketbase {
         per_page: usize,
         params: Option<&ListParams>,
     ) -> Result<Records<T>, PbErr> {
-        let mut p: Vec<(&str, String)> = vec![
-            ("page", page.to_string()),
-            ("perPage", per_page.to_string()),
-        ];
+        let page_str = page.to_string();
+        let per_page_str = per_page.to_string();
+        let mut p: Vec<(&str, &str)> = vec![("page", &page_str), ("perPage", &per_page_str)];
         if let Some(params) = params {
             if let Some(ref f) = params.filter {
-                p.push(("filter", f.to_string()));
+                p.push(("filter", f));
             }
             if let Some(ref s) = params.sort {
-                p.push(("sort", s.to_string()));
+                p.push(("sort", s));
             }
             if let Some(ref e) = params.expand {
-                p.push(("expand", e.to_string()));
+                p.push(("expand", e));
             }
             if let Some(ref f) = params.fields {
-                p.push(("fields", f.to_string()));
+                p.push(("fields", f));
             }
         }
         let path = format!("/api/collections/{}/records", collection);
-        self.get(&path, &p).await
+        self.get(&path, p).await
     }
     pub async fn view<T: for<'a> Deserialize<'a>>(
         &self,
         collection: &str,
         id: &str,
     ) -> Result<T, PbErr> {
-        let p: Vec<(&str, String)> = vec![];
         let path = format!("/api/collections/{}/records/{}", collection, id);
-        self.get(&path, &p).await
+        self.get(&path, vec![]).await
     }
     pub async fn create<T: for<'a> Deserialize<'a> + Serialize>(
         &self,
@@ -308,14 +302,8 @@ impl Pocketbase {
         let path = format!("/api/collections/{}/records/{}", collection, id);
         self.patch(&path, &body).await
     }
-    pub async fn remove(
-        &self,
-        collection: &str,
-        id: &str,
-    ) {
+    pub async fn remove(&self, collection: &str, id: &str) {
         let path = format!("/api/collections/{}/records/{}", collection, id);
-        self.delete(&path).await;
+        let _ = self.delete(&path).await;
     }
-
-
 }
