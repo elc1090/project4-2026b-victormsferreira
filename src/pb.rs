@@ -1,5 +1,4 @@
 use gloo_net::http::Request;
-use implicit_clone::ImplicitClone;
 use serde::{Deserialize, Serialize};
 use std::vec::Vec;
 
@@ -8,6 +7,17 @@ pub enum PbErr {
     GenericError,
     ParseFail,
     RequestFail,
+}
+#[derive(Default, Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct Record<T> {
+    pub collection_id : String,
+    pub collection_name: String,
+    pub id: String,
+    pub created: String,
+    pub updated: String,
+    #[serde(flatten)]
+    pub item: T,
 }
 
 #[derive(Default, Serialize, Deserialize, Clone, Debug, PartialEq)]
@@ -28,7 +38,7 @@ pub struct AuthStore {
     pub record: AuthStoreRecord,
 }
 
-#[derive(Default, PartialEq, Clone, ImplicitClone)]
+#[derive(Default, PartialEq, Clone)]
 pub struct Pocketbase {
     addr: String,
     //client: Client,
@@ -47,7 +57,7 @@ pub struct Records<T> {
     pub per_page: usize,
     pub total_pages: usize,
     pub total_items: usize,
-    pub items: Vec<T>,
+    pub items: Vec<Record<T>>,
 }
 
 // Implementation of basic API methods
@@ -73,6 +83,7 @@ impl Pocketbase {
                 }
             }
         }
+
         Err(PbErr::RequestFail)
     }
 
@@ -152,21 +163,19 @@ impl Pocketbase {
 // Implementation of auth methods
 impl Pocketbase {
     pub async fn auth_with_password(
-        self,
+        &mut self,
         collection: &str,
         identity: &str,
         password: &str,
-    ) -> Self {
+    ) {
         let body = PasswordCred {
             identity: identity.to_string(),
             password: password.to_string(),
         };
-        let path = format!("/api/collections/{}/auth-with-password", collection);
+        let path = format!("api/collections/{}/auth-with-password", collection);
         let response = self.post::<AuthStore>(&path, &body).await;
         if let Ok(new_auth) = response {
-            Self { auth_store : new_auth, ..Default::default()}
-        } else {
-            self
+            self.auth_store = new_auth;
         }
     }
 }
@@ -219,8 +228,8 @@ impl Pocketbase {
         &self,
         collection: &str,
         params: Option<&ListParams>,
-    ) -> Vec<T> {
-        let mut result: Vec<T> = vec![];
+    ) -> Vec<Record<T>> {
+        let mut result: Vec<Record<T>> = vec![];
         let batch_size: usize = 1000;
         let mut page: usize = 1;
         let mut done = false;
@@ -241,7 +250,7 @@ impl Pocketbase {
         &self,
         collection: &str,
         params: Option<&ListParams>,
-    ) -> Option<T> {
+    ) -> Option<Record<T>> {
         let list: Result<Records<T>, PbErr> = self.list(collection, 1, 1, params).await;
         if let Ok(l) = list
             && !l.items.is_empty()
@@ -274,23 +283,23 @@ impl Pocketbase {
                 p.push(("fields", f));
             }
         }
-        let path = format!("/api/collections/{}/records", collection);
+        let path = format!("api/collections/{}/records", collection);
         self.get(&path, p).await
     }
     pub async fn view<T: for<'a> Deserialize<'a>>(
         &self,
         collection: &str,
         id: &str,
-    ) -> Result<T, PbErr> {
-        let path = format!("/api/collections/{}/records/{}", collection, id);
+    ) -> Result<Record<T>, PbErr> {
+        let path = format!("api/collections/{}/records/{}", collection, id);
         self.get(&path, vec![]).await
     }
     pub async fn create<T: for<'a> Deserialize<'a> + Serialize>(
         &self,
         collection: &str,
         body: T,
-    ) -> Result<T, PbErr> {
-        let path = format!("/api/collections/{}/records", collection);
+    ) -> Result<Record<T>, PbErr> {
+        let path = format!("api/collections/{}/records", collection);
         self.post(&path, &body).await
     }
     pub async fn update<T: for<'a> Deserialize<'a> + Serialize>(
@@ -298,12 +307,12 @@ impl Pocketbase {
         collection: &str,
         id: &str,
         body: T,
-    ) -> Result<T, PbErr> {
-        let path = format!("/api/collections/{}/records/{}", collection, id);
+    ) -> Result<Record<T>, PbErr> {
+        let path = format!("api/collections/{}/records/{}", collection, id);
         self.patch(&path, &body).await
     }
     pub async fn remove(&self, collection: &str, id: &str) {
-        let path = format!("/api/collections/{}/records/{}", collection, id);
+        let path = format!("api/collections/{}/records/{}", collection, id);
         let _ = self.delete(&path).await;
     }
 }
