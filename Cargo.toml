@@ -4,6 +4,10 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-reqwest = { version = "0.13", features = ["json"] }
-tokio = { version = "1", features = ["full"] }
+gloo-net = { version = "0.7", features = ["json"]}
+tokio = { version = "1"}
 serde = { version = "1.0", features = ["derive"] }  
+yew = { version = "0.23", features = ["csr"] }
+yew-autoprops = "0.5.0"
+implicit-clone = "0.6.0"
+gloo-console = "0.4.1"
