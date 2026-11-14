@@ -11,7 +11,7 @@ pub enum PbErr {
 #[derive(Default, Serialize, Deserialize, Clone, Debug, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct Record<T> {
-    pub collection_id : String,
+    pub collection_id: String,
     pub collection_name: String,
     pub id: String,
     pub created: String,
@@ -162,12 +162,7 @@ impl Pocketbase {
 
 // Implementation of auth methods
 impl Pocketbase {
-    pub async fn auth_with_password(
-        &mut self,
-        collection: &str,
-        identity: &str,
-        password: &str,
-    ) {
+    pub async fn auth_with_password(&mut self, collection: &str, identity: &str, password: &str) {
         let body = PasswordCred {
             identity: identity.to_string(),
             password: password.to_string(),
