@@ -292,7 +292,7 @@ impl Pocketbase {
     pub async fn create<T: for<'a> Deserialize<'a> + Serialize>(
         &self,
         collection: &str,
-        body: T,
+        body: &T,
     ) -> Result<Record<T>, PbErr> {
         let path = format!("api/collections/{}/records", collection);
         self.post(&path, &body).await
@@ -301,7 +301,7 @@ impl Pocketbase {
         &self,
         collection: &str,
         id: &str,
-        body: T,
+        body: &T,
     ) -> Result<Record<T>, PbErr> {
         let path = format!("api/collections/{}/records/{}", collection, id);
         self.patch(&path, &body).await
