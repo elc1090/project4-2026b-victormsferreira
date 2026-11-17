@@ -42,12 +42,22 @@ pub struct AuthStore {
 pub struct Pocketbase {
     addr: String,
     //client: Client,
-    pub auth_store: AuthStore,
+    pub auth_store: Option<AuthStore>,
 }
 #[derive(Default, Serialize, Deserialize)]
 struct PasswordCred {
     identity: String,
     password: String,
+}
+
+#[derive(Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct OAuth2<T> {
+    provider: String,
+    code: String,
+    code_verifier: String,
+    redirect_url: String,
+    create_data: Option<T>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -68,11 +78,15 @@ impl Pocketbase {
         params: Vec<(&str, &str)>,
     ) -> Result<T, PbErr> {
         let url: String = format!("{}/{}", self.addr, path);
-        let response = Request::get(&url)
-            .query(params)
-            .header("Authorization", &self.auth_store.token)
-            .send()
-            .await;
+        let request = Request::get(&url);
+        let response = if let Some(auth_store) = &self.auth_store {
+            request.header("Authorization", &auth_store.token)
+        } else {
+            request
+        }
+        .query(params)
+        .send()
+        .await;
         if let Ok(body) = response {
             match body.json::<T>().await {
                 Ok(result) => {
@@ -93,12 +107,16 @@ impl Pocketbase {
         body: &impl Serialize,
     ) -> Result<T, PbErr> {
         let url: String = format!("{}/{}", self.addr, path);
-        let response = Request::post(&url)
-            .header("Authorization", &self.auth_store.token)
-            .json(body)
-            .unwrap()
-            .send()
-            .await;
+        let request = Request::post(&url);
+        let response = if let Some(auth_store) = &self.auth_store {
+            request.header("Authorization", &auth_store.token)
+        } else {
+            request
+        }
+        .json(body)
+        .unwrap()
+        .send()
+        .await;
 
         if let Ok(body) = response {
             match body.json::<T>().await {
@@ -119,12 +137,16 @@ impl Pocketbase {
         body: &impl Serialize,
     ) -> Result<T, PbErr> {
         let url: String = format!("{}/{}", self.addr, path);
-        let response = Request::patch(&url)
-            .header("Authorization", &self.auth_store.token)
-            .json(body)
-            .unwrap()
-            .send()
-            .await;
+        let request = Request::patch(&url);
+        let response = if let Some(auth_store) = &self.auth_store {
+            request.header("Authorization", &auth_store.token)
+        } else {
+            request
+        }
+        .json(body)
+        .unwrap()
+        .send()
+        .await;
         if let Ok(body) = response {
             match body.json::<T>().await {
                 Ok(result) => {
@@ -139,10 +161,14 @@ impl Pocketbase {
     }
     pub async fn delete(&self, path: &str) -> Result<(), PbErr> {
         let url: String = format!("{}/{}", self.addr, path);
-        let response = Request::delete(&url)
-            .header("Authorization", &self.auth_store.token)
-            .send()
-            .await;
+        let request = Request::delete(&url);
+        let response = if let Some(auth_store) = &self.auth_store {
+            request.header("Authorization", &auth_store.token)
+        } else {
+            request
+        }
+        .send()
+        .await;
         if response.is_ok() {
             return Ok(());
         }
@@ -162,15 +188,25 @@ impl Pocketbase {
 
 // Implementation of auth methods
 impl Pocketbase {
-    pub async fn auth_with_password(&mut self, collection: &str, identity: &str, password: &str) {
+    pub async fn auth_with_password(
+        &self,
+        collection: &str,
+        identity: &str,
+        password: &str,
+    ) -> Self {
         let body = PasswordCred {
             identity: identity.to_string(),
             password: password.to_string(),
         };
         let path = format!("api/collections/{}/auth-with-password", collection);
         let response = self.post::<AuthStore>(&path, &body).await;
-        if let Ok(new_auth) = response {
-            self.auth_store = new_auth;
+        Self {
+            auth_store: if let Ok(new_auth) = response {
+                Some(new_auth)
+            } else {
+                None
+            },
+            ..self.clone()
         }
     }
 }
