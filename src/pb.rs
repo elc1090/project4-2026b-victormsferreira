@@ -1,6 +1,8 @@
 use gloo_net::http::Request;
+use gloo_storage::{LocalStorage, Storage};
 use serde::{Deserialize, Serialize};
 use std::vec::Vec;
+const STORAGE_KEY: &str = "auth-store";
 
 #[derive(Debug)]
 pub enum PbErr {
@@ -58,6 +60,52 @@ struct OAuth2<T> {
     code_verifier: String,
     redirect_url: String,
     create_data: Option<T>,
+}
+
+#[derive(Default, Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct AuthMethodMFA {
+    pub enabled: bool,
+    pub duration: i32,
+}
+#[derive(Default, Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct AuthMethodOTP {
+    pub enabled: bool,
+    pub duration: i32,
+}
+
+#[derive(Default, Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct AuthMethodPassword {
+    pub enabled: bool,
+    pub identity_fields: Vec<String>,
+}
+#[derive(Default, Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct AuthMethodOAuth2Provider {
+    pub state: String,
+    pub auth_url: String,
+    pub code_verifier: String,
+    pub code_challenge: String,
+    pub name: String,
+    pub logo: String,
+    pub code_challenge_method: String,
+    pub display_name: String,
+}
+#[derive(Default, Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct AuthMethodOAuth2 {
+    pub enabled: bool,
+    pub providers: Vec<AuthMethodOAuth2Provider>,
+}
+#[derive(Default, Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct AuthMethods {
+    pub mfa: AuthMethodMFA,
+    pub otp: AuthMethodOTP,
+    pub password: AuthMethodPassword,
+    pub oauth2: AuthMethodOAuth2,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -181,7 +229,11 @@ impl Pocketbase {
         Self {
             addr: addr.to_string(),
             //client: Client::new(),
-            auth_store: Default::default(),
+            auth_store: if let Ok(stored) = LocalStorage::get::<AuthStore>(STORAGE_KEY) {
+                Some(stored)
+            } else {
+                None
+            },
         }
     }
 }
@@ -202,11 +254,23 @@ impl Pocketbase {
         let response = self.post::<AuthStore>(&path, &body).await;
         Self {
             auth_store: if let Ok(new_auth) = response {
+                let _ = LocalStorage::set(STORAGE_KEY, &new_auth);
                 Some(new_auth)
             } else {
                 None
             },
             ..self.clone()
+        }
+    }
+    pub async fn list_auth_methods(&self, collection: &str) -> AuthMethods {
+        let path = format!("api/collections/{}/auth-methods", collection);
+        let response = self.get::<AuthMethods>(&path, vec![]).await;
+        if let Ok(auth_methods) = response {
+            auth_methods
+        } else {
+            AuthMethods {
+                ..Default::default()
+            }
         }
     }
 }
