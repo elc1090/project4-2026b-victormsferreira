@@ -52,14 +52,20 @@ struct PasswordCred {
     password: String,
 }
 
+impl AuthStore {
+    fn clear() -> Self {
+        Self {..Default::default()}
+    } 
+}
+
 #[derive(Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct OAuth2<T> {
-    provider: String,
-    code: String,
-    code_verifier: String,
-    redirect_url: String,
-    create_data: Option<T>,
+pub struct OAuth2<T> {
+    pub provider: String,
+    pub code: String,
+    pub code_verifier: String,
+    pub redirect_url: String,
+    pub create_data: Option<T>,
 }
 
 #[derive(Default, Serialize, Deserialize, Debug)]
@@ -271,6 +277,23 @@ impl Pocketbase {
             AuthMethods {
                 ..Default::default()
             }
+        }
+    }
+    pub async fn auth_with_oauth2<T: for<'a> Deserialize<'a> + Serialize>(
+        &self,
+        collection: &str,
+        data: &OAuth2<T>,
+    ) -> Self {
+        let path = format!("api/collections/{}/auth-with-oauth2", collection);
+        let response = self.post::<AuthStore>(&path, data).await;
+        Self {
+            auth_store: if let Ok(new_auth) = response {
+                let _ = LocalStorage::set(STORAGE_KEY, &new_auth);
+                Some(new_auth)
+            } else {
+                None
+            },
+            ..self.clone()
         }
     }
 }

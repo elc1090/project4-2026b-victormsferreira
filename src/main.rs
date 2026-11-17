@@ -1,12 +1,24 @@
 #[allow(dead_code)]
 mod pb;
-use crate::pb::Pocketbase;
+use crate::pb::{Pocketbase};
 use std::rc::Rc;
 use yew::{Callback, prelude::*};
 use yew_autoprops::autoprops;
 use yew_router::prelude::*;
 mod auth;
-use auth::{LoginForm, SignUpForm};
+use auth::{LoginForm, RedirectOAuth, SignUpForm};
+
+#[autoprops]
+#[component]
+fn Home(pb: Rc<Pocketbase>, on_login: Callback<Pocketbase>, username: AttrValue) -> Html {
+    html! {
+        <div style="display: flexbox; width: 100%; height: 100%; flex-direction: column">
+        <SignUpForm pb={Rc::clone(&pb)} />
+        <LoginForm pb={Rc::clone(&pb)} on_login_event={on_login} />
+        <p>{username}</p>
+        </div>
+    }
+}
 
 #[autoprops]
 #[component]
@@ -20,27 +32,53 @@ fn App() -> Html {
             None
         }
     });
-    let on_loginform_login = {
+    let switch = {
+        let on_login = {
+            let pb = pb.clone();
+            let username = username.clone();
+            Callback::from(move |new_pb: Pocketbase| {
+                pb.set(Rc::new(new_pb));
+                let un = if let Some(authstore) = Rc::clone(&pb).auth_store.clone() {
+                    authstore.record.name.clone()
+                } else {
+                    None
+                };
+                username.set(un);
+            })
+        };
+
         let pb = pb.clone();
-        let username = username.clone();
-        Callback::from(move |new_pb: Pocketbase| {
-            pb.set(Rc::new(new_pb));
-            let un = if let Some(authstore) = Rc::clone(&pb).auth_store.clone() {
-                authstore.record.name.clone()
+
+        Callback::from(move |route| {
+            let us = username.clone();
+            let username = if let Some(u) = &*us {
+                u.clone()
             } else {
-                None
+                "No User".to_string()
             };
-            username.set(un);
+            match route {
+                Route::Home => {
+                    html! {<Home pb={Rc::clone(&pb)} on_login={on_login.clone()} username={username}/>}
+                }
+                Route::RedirectOAuth => {
+                    html! {<RedirectOAuth pb={Rc::clone(&pb)} on_login={on_login.clone()}/>}
+                }
+            }
         })
     };
-
     html! {
-        <div style="display: flexbox; width: 100%; height: 100%; flex-direction: column">
-        <SignUpForm pb={Rc::clone(&*pb)} />
-        <LoginForm pb={Rc::clone(&*pb)} on_login_event={on_loginform_login} />
-        <p>{if let Some(name) = &*username {name} else {"No User"}}</p>
-        </div>
+        <BrowserRouter>
+            <Switch<Route> render={switch}/>
+        </BrowserRouter>
     }
+}
+
+#[derive(Clone, Routable, PartialEq)]
+enum Route {
+    #[at("/")]
+    Home,
+    #[at("/oauth/redirect")]
+    RedirectOAuth,
 }
 
 fn main() {

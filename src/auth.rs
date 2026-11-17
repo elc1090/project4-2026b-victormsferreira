@@ -1,5 +1,5 @@
-use crate::pb::Pocketbase;
-use gloo_console::log;
+use crate::Route;
+use crate::pb::{OAuth2, Pocketbase};
 use gloo_storage::{LocalStorage, Storage};
 use serde::{Deserialize, Serialize};
 use std::rc::Rc;
@@ -7,6 +7,9 @@ use web_sys::{HtmlElement, HtmlInputElement};
 use yew::{Callback, prelude::*, suspense::use_future};
 use yew_autoprops::autoprops;
 use yew_hooks::*;
+use yew_router::hooks::use_navigator;
+use yew_router::hooks::use_location;
+
 #[derive(Clone)]
 struct LoginInfo {
     username: String,
@@ -40,7 +43,7 @@ fn OAuth2Login(pb: Rc<Pocketbase>) -> HtmlResult {
         let pb = Rc::clone(&pb);
         use_future(|| async move { pb.list_auth_methods("users").await })
     };
-    const REDIRECT_URL: &str = "http://127.0.0.1:8090/redirect";
+    const REDIRECT_URL: &str = "http://127.0.0.1:8080/oauth/redirect";
     match &*&auth_methods {
         Ok(auths) => Ok(html! {
             <div>
@@ -51,7 +54,6 @@ fn OAuth2Login(pb: Rc<Pocketbase>) -> HtmlResult {
                     Callback::from(move |_| {
                         let _ = LocalStorage::set("ProviderName", &name);
                         let _ = LocalStorage::set("CodeVerifier", &verifier);
-                        log!(&name);
                 })}>
                 <ProviderLogo logo={provider.logo.clone()} />
                 <p>{&provider.display_name}</p>
@@ -192,5 +194,46 @@ pub fn SignUpForm(pb: Rc<Pocketbase>) -> Html {
         <input autocomplete={"new-password"} id={"password_confirm"} name={"password_confirm"} oninput={on_passwordconfirminput} type="password" />
         <button type="submit">{"Registrar"} </button>
         </form>
+    }
+}
+
+#[derive(Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct RedirectOAuthParams {
+    code: String,
+}
+
+#[autoprops]
+#[component]
+pub fn RedirectOAuth(
+    pb: Rc<Pocketbase>,
+    on_login: Callback<Pocketbase>,
+) -> Html {
+    let navigator = use_navigator().unwrap();
+    let location = use_location().unwrap();
+    let provider = location.query::<RedirectOAuthParams>().unwrap();
+    let provider_name = LocalStorage::get::<String>("ProviderName").unwrap();
+    let verifier = LocalStorage::get::<String>("CodeVerifier").unwrap();
+    const REDIRECT_URL: &str = "http://127.0.0.1:8080/oauth/redirect";
+
+    let on_auth = {
+        let pb = pb.clone();
+        use_future(|| async move {
+            let oauth = OAuth2::<()> {
+                provider: provider_name.clone(),
+                code: provider.code.clone(),
+                code_verifier: verifier.clone(),
+                redirect_url: REDIRECT_URL.to_string(),
+                create_data: None,
+            };
+
+            on_login.emit(pb.auth_with_oauth2("users", &oauth).await);
+            navigator.push(&Route::Home);
+        })
+    };
+    
+    match &*&on_auth {
+        Ok(_) => html! {<p>{"Redirecting"}</p>},
+        Err(_) => html! {<p>{"Redirecting"}</p>},
     }
 }
