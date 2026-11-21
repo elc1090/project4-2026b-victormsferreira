@@ -1,14 +1,14 @@
 use crate::Route;
 use crate::pb::{OAuth2, Pocketbase};
+use gloo_console::log;
 use gloo_storage::{LocalStorage, Storage};
 use serde::{Deserialize, Serialize};
 use std::rc::Rc;
-use web_sys::{HtmlElement, HtmlInputElement};
+use web_sys::{HtmlInputElement, window};
 use yew::{Callback, prelude::*, suspense::use_future};
 use yew_autoprops::autoprops;
 use yew_hooks::*;
-use yew_router::hooks::use_navigator;
-use yew_router::hooks::use_location;
+use yew_router::hooks::{use_location, use_navigator};
 
 #[derive(Clone)]
 struct LoginInfo {
@@ -19,22 +19,12 @@ struct LoginInfo {
 #[autoprops]
 #[component]
 fn ProviderLogo(logo: AttrValue) -> Html {
-    let node_ref = use_node_ref();
-    {
-        let node_ref = node_ref.clone();
-        let logo = logo.clone();
-        use_effect_with(node_ref, move |node_ref| {
-            let div = node_ref
-                .cast::<HtmlElement>()
-                .expect("div_ref not attached to div element");
-            div.set_inner_html(&logo);
-        });
-    }
-
+    let parsed = Html::from_html_unchecked(logo);
     html! {
-        <div ref={node_ref}></div>
+        {parsed}
     }
 }
+
 
 #[autoprops]
 #[component]
@@ -44,22 +34,23 @@ fn OAuth2Login(pb: Rc<Pocketbase>) -> HtmlResult {
         use_future(|| async move { pb.list_auth_methods("users").await })
     };
     const REDIRECT_URL: &str = "http://127.0.0.1:8080/oauth/redirect";
+
     match &*&auth_methods {
         Ok(auths) => Ok(html! {
-            <div>
             for provider in &auths.oauth2.providers {
-                <a href={format!("{}{}", provider.auth_url, REDIRECT_URL)} onclick={
+                <button type="button" onclick={
                     let name = provider.name.clone();
                     let verifier = provider.code_verifier.clone();
+                    let url = format!("{}{}", provider.auth_url, REDIRECT_URL);
                     Callback::from(move |_| {
-                        let _ = LocalStorage::set("ProviderName", &name);
-                        let _ = LocalStorage::set("CodeVerifier", &verifier);
+                        let _ = LocalStorage::set("ProviderName", &name).unwrap();
+                        let _ = LocalStorage::set("CodeVerifier", &verifier).unwrap();
+                        let window = window().unwrap();
+                        window.document().unwrap().location().unwrap().set_href(&url).unwrap();
                 })}>
-                <ProviderLogo logo={provider.logo.clone()} />
-                <p>{&provider.display_name}</p>
-                 </a>
+                {&provider.display_name}
+                 </button>
             }
-            </div>
         }),
         Err(_) => Ok(html! {<p>{"Erro carregando Metódos de Autenticação"}</p>}),
     }
@@ -75,6 +66,7 @@ pub fn LoginForm(pb: Rc<Pocketbase>, on_login_event: Callback<Pocketbase>) -> Ht
     let login: UseAsyncHandle<(), ()> = {
         let login_info = login_info.clone();
         let pb = pb.clone();
+        let on_login_event = on_login_event.clone();
         use_async(async move {
             Ok(on_login_event.emit(
                 pb.auth_with_password("users", &login_info.username, &login_info.password)
@@ -106,14 +98,13 @@ pub fn LoginForm(pb: Rc<Pocketbase>, on_login_event: Callback<Pocketbase>) -> Ht
     };
 
     html! {
-        <form {onsubmit} style="display: flexbox; width: 100%; height: 100%; flex-direction: column;">
-            <label for={"username"}><b>{"Nome de Usuário"}</b></label>
-            <input autocomplete={"username"} id={"username"} name={"username"} oninput={on_usernameinput} type="text" />
-            <label for={"password"}><b>{"Senha"}</b></label>
-            <input id={"password"} name={"password"} oninput={on_passwordinput} type="password" />
+        <form {onsubmit} class="authForm">
+            <h3>{"Login"}</h3>
+            <input placeholder="Email" autocomplete={"username"} id={"username"} name={"username"} oninput={on_usernameinput} type="text" />
+            <input placeholder="Senha" id={"password"} name={"password"} oninput={on_passwordinput} type="password" />
             <button type={"submit"}>{"Login"} </button>
             <Suspense fallback={html! {<p> {"..."} </p>}} >
-                <OAuth2Login pb={pb.clone()} />
+                <OAuth2Login pb={pb.clone()}/>
             </Suspense>
         </form>
     }
@@ -123,7 +114,7 @@ pub fn LoginForm(pb: Rc<Pocketbase>, on_login_event: Callback<Pocketbase>) -> Ht
 #[serde(rename_all = "camelCase")]
 struct SignUpInfo {
     email: String,
-    username: String,
+    name: String,
     password: String,
     password_confirm: String,
 }
@@ -134,12 +125,14 @@ pub fn SignUpForm(pb: Rc<Pocketbase>) -> Html {
     let signup_info = use_state(|| SignUpInfo {
         ..Default::default()
     });
+    let navigator = use_navigator().unwrap();
     let login: UseAsyncHandle<(), ()> = {
         let signup_info = signup_info.clone();
         let pb = pb.clone();
         use_async(async move {
             Ok({
                 let _ = pb.create("users", &*(signup_info)).await;
+                navigator.push(&Route::Login);
             })
         })
     };
@@ -153,7 +146,7 @@ pub fn SignUpForm(pb: Rc<Pocketbase>) -> Html {
         let signup_info = signup_info.clone();
         Callback::from(move |e: InputEvent| {
             let mut c = (*signup_info).clone();
-            c.username = e.target_unchecked_into::<HtmlInputElement>().value();
+            c.name = e.target_unchecked_into::<HtmlInputElement>().value();
             signup_info.set(c);
         })
     };
@@ -183,16 +176,13 @@ pub fn SignUpForm(pb: Rc<Pocketbase>) -> Html {
         })
     };
     html! {
-        <form {onsubmit} style="display: flexbox; width: 100%; height: 100%; flex-direction: column;">
-        <label for={"email"}><b>{"Email"}</b></label>
-        <input autocomplete={"username"} id={"email"} name={"email"} oninput={on_emailinput} type="text" />
-        <label for={"username"}><b>{"Nome de Usuário"}</b></label>
-        <input autocomplete={"username"} id={"username"} name={"username"} oninput={on_usernameinput} type="text" />
-        <label for={"password"}><b>{"Senha"}</b></label>
-        <input autocomplete={"new-password"} id={"password"} name={"password"} oninput={on_passwordinput} type="password" />
-        <label for={"password_confirm"}><b>{"Confirme sua senha"}</b></label>
-        <input autocomplete={"new-password"} id={"password_confirm"} name={"password_confirm"} oninput={on_passwordconfirminput} type="password" />
-        <button type="submit">{"Registrar"} </button>
+        <form {onsubmit} class="authForm">
+            <h3>{"Registro"}</h3>
+            <input placeholder="Email" autocomplete={"username"} id={"email"} name={"email"} oninput={on_emailinput} type="text" />
+            <input placeholder="Nome de Usuário" autocomplete={"username"} id={"username"} name={"username"} oninput={on_usernameinput} type="text" />
+            <input placeholder="Senha" autocomplete={"new-password"} id={"password"} name={"password"} oninput={on_passwordinput} type="password" />
+            <input placeholder="Confirme sua Senha" autocomplete={"new-password"} id={"password_confirm"} name={"password_confirm"} oninput={on_passwordconfirminput} type="password" />
+            <button type="submit">{"Registrar"} </button>
         </form>
     }
 }
@@ -205,35 +195,29 @@ struct RedirectOAuthParams {
 
 #[autoprops]
 #[component]
-pub fn RedirectOAuth(
-    pb: Rc<Pocketbase>,
-    on_login: Callback<Pocketbase>,
-) -> Html {
-    let navigator = use_navigator().unwrap();
+pub fn RedirectOAuth(pb: Rc<Pocketbase>, on_login_event: Callback<Pocketbase>) -> Html {
     let location = use_location().unwrap();
     let provider = location.query::<RedirectOAuthParams>().unwrap();
-    let provider_name = LocalStorage::get::<String>("ProviderName").unwrap();
-    let verifier = LocalStorage::get::<String>("CodeVerifier").unwrap();
-    const REDIRECT_URL: &str = "http://127.0.0.1:8080/oauth/redirect";
+    let auth = use_future(|| async move {
+        const REDIRECT_URL: &str = "http://127.0.0.1:8080/oauth/redirect";
+        log!(&provider.code);
+        let provider_name: String = LocalStorage::get::<String>("ProviderName").unwrap();
+        let provider_code: String = provider.code;
+        let verifier = LocalStorage::get::<String>("CodeVerifier").unwrap();
+        let oauth: OAuth2<()> = OAuth2::<()> {
+            provider: provider_name.clone(),
+            code: provider_code.clone(),
+            code_verifier: verifier.clone(),
+            redirect_URL: REDIRECT_URL.to_string(),
+            create_data: None,
+        };
+        let pb = pb.auth_with_oauth2("users", &oauth).await;
+        on_login_event.emit(pb);
+        LocalStorage::set("ProviderCode", ()).unwrap();
+    });
 
-    let on_auth = {
-        let pb = pb.clone();
-        use_future(|| async move {
-            let oauth = OAuth2::<()> {
-                provider: provider_name.clone(),
-                code: provider.code.clone(),
-                code_verifier: verifier.clone(),
-                redirect_url: REDIRECT_URL.to_string(),
-                create_data: None,
-            };
-
-            on_login.emit(pb.auth_with_oauth2("users", &oauth).await);
-            navigator.push(&Route::Home);
-        })
-    };
-    
-    match &*&on_auth {
-        Ok(_) => html! {<p>{"Redirecting"}</p>},
-        Err(_) => html! {<p>{"Redirecting"}</p>},
+    match auth {
+        Ok(_) =>  html! {<p>{"Redirecting..."}</p>},
+        Err(_) => html! {<p>{"Redirecting..."}</p>},
     }
 }

@@ -42,7 +42,7 @@ pub struct AuthStore {
 
 #[derive(Default, PartialEq, Clone)]
 pub struct Pocketbase {
-    addr: String,
+    pub addr: String,
     //client: Client,
     pub auth_store: Option<AuthStore>,
 }
@@ -54,8 +54,10 @@ struct PasswordCred {
 
 impl AuthStore {
     fn clear() -> Self {
-        Self {..Default::default()}
-    } 
+        Self {
+            ..Default::default()
+        }
+    }
 }
 
 #[derive(Default, Serialize, Deserialize)]
@@ -64,7 +66,8 @@ pub struct OAuth2<T> {
     pub provider: String,
     pub code: String,
     pub code_verifier: String,
-    pub redirect_url: String,
+    #[allow(non_snake_case)]
+    pub redirect_URL: String,
     pub create_data: Option<T>,
 }
 
@@ -87,7 +90,7 @@ pub struct AuthMethodPassword {
     pub enabled: bool,
     pub identity_fields: Vec<String>,
 }
-#[derive(Default, Serialize, Deserialize, Debug)]
+#[derive(Default, Serialize, Deserialize, Debug, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct AuthMethodOAuth2Provider {
     pub state: String,

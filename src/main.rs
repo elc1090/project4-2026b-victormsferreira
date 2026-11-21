@@ -1,22 +1,23 @@
 #[allow(dead_code)]
 mod pb;
-use crate::pb::{Pocketbase};
+use crate::{pb::Pocketbase};
 use std::rc::Rc;
+use web_sys::window;
 use yew::{Callback, prelude::*};
 use yew_autoprops::autoprops;
-use yew_router::prelude::*;
+use yew_router::{prelude::*};
 mod auth;
 use auth::{LoginForm, RedirectOAuth, SignUpForm};
+use gloo_console::log;
 
 #[autoprops]
 #[component]
-fn Home(pb: Rc<Pocketbase>, on_login: Callback<Pocketbase>, username: AttrValue) -> Html {
+fn Home(pb: Rc<Pocketbase>, username: AttrValue) -> Html {
     html! {
-        <div style="display: flexbox; width: 100%; height: 100%; flex-direction: column">
-        <SignUpForm pb={Rc::clone(&pb)} />
-        <LoginForm pb={Rc::clone(&pb)} on_login_event={on_login} />
-        <p>{username}</p>
-        </div>
+        //<div style="display: flexbox; width: 100%; height: 100%; flex-direction: column">
+        //<SignUpForm pb={Rc::clone(&pb)} />
+       <h3>{username}</h3>
+        //</div>
     }
 }
 
@@ -32,18 +33,32 @@ fn App() -> Html {
             None
         }
     });
+    let navigator = use_navigator().unwrap();
     let switch = {
         let on_login = {
             let pb = pb.clone();
             let username = username.clone();
             Callback::from(move |new_pb: Pocketbase| {
-                pb.set(Rc::new(new_pb));
-                let un = if let Some(authstore) = Rc::clone(&pb).auth_store.clone() {
-                    authstore.record.name.clone()
+                log!(&pb.addr);
+                log!("Got OnLogin Callback");
+                if new_pb.auth_store.is_some() {
+                    pb.set(Rc::new(new_pb));
+                    let un = if let Some(authstore) = Rc::clone(&pb).auth_store.clone() {
+                        authstore.record.name.clone()
+                    } else {
+                        None
+                    };
+                    username.set(un);
+                    navigator.push(&Route::Home);
+                    log!("Testing Testing 123");
                 } else {
-                    None
-                };
-                username.set(un);
+                    window()
+                        .unwrap()
+                        .alert_with_message("Login inválido.")
+                        .unwrap();
+                    navigator.push(&Route::Login);
+
+                }
             })
         };
 
@@ -58,17 +73,32 @@ fn App() -> Html {
             };
             match route {
                 Route::Home => {
-                    html! {<Home pb={Rc::clone(&pb)} on_login={on_login.clone()} username={username}/>}
+                    html! {<Home pb={Rc::clone(&pb)} username={username}/>}
                 }
+                Route::Login => {
+                    html! { <LoginForm pb={Rc::clone(&pb)} on_login_event={on_login.clone()} />}
+                }
+                Route::SignUp => {
+                    html! { <SignUpForm pb={Rc::clone(&pb)} />}
+                }                
                 Route::RedirectOAuth => {
-                    html! {<RedirectOAuth pb={Rc::clone(&pb)} on_login={on_login.clone()}/>}
+                    html! {<RedirectOAuth pb={Rc::clone(&pb)} on_login_event={on_login.clone()}/>}
                 }
+
             }
         })
     };
     html! {
+        <Switch<Route> render={switch}/>
+    }
+}
+
+#[autoprops]
+#[component]
+fn Router() -> Html {
+    html! {
         <BrowserRouter>
-            <Switch<Route> render={switch}/>
+            <App/>
         </BrowserRouter>
     }
 }
@@ -77,10 +107,17 @@ fn App() -> Html {
 enum Route {
     #[at("/")]
     Home,
+    #[at("/Login")]
+    Login,
+    #[at("/SignUp")]
+    SignUp,
+
     #[at("/oauth/redirect")]
     RedirectOAuth,
 }
 
+
+
 fn main() {
-    yew::Renderer::<App>::new().render();
+    yew::Renderer::<Router>::new().render();
 }

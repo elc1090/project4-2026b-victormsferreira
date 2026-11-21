@@ -615,6 +615,7 @@ dependencies = [
  "implicit-clone",
  "serde",
  "tokio",
+ "wasm-bindgen",
  "web-sys",
  "yew",
  "yew-autoprops",
