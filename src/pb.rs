@@ -306,6 +306,19 @@ impl Pocketbase {
             ..self.clone()
         }
     }
+    pub async fn auth_refresh(&self, collection: &str) -> Self {
+        let path = format!("api/collections/{}/auth-refresh", collection);
+        let response = self.post::<AuthStore>(&path, &()).await;
+        Self {
+            auth_store: if let Ok(new_auth) = response {
+                let _ = LocalStorage::set(STORAGE_KEY, &new_auth);
+                Some(new_auth)
+            } else {
+                None
+            },
+            ..self.clone()
+        }
+    }
 }
 
 #[derive(Default, Clone)]
