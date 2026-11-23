@@ -25,7 +25,6 @@ fn ProviderLogo(logo: AttrValue) -> Html {
     }
 }
 
-
 #[autoprops]
 #[component]
 fn OAuth2Login(pb: Rc<Pocketbase>) -> HtmlResult {
@@ -46,6 +45,7 @@ fn OAuth2Login(pb: Rc<Pocketbase>) -> HtmlResult {
                         let _ = LocalStorage::set("ProviderName", &name).unwrap();
                         let _ = LocalStorage::set("CodeVerifier", &verifier).unwrap();
                         let window = window().unwrap();
+                        log!(&url);
                         window.document().unwrap().location().unwrap().set_href(&url).unwrap();
                 })}>
                 {&provider.display_name}
@@ -98,6 +98,7 @@ pub fn LoginForm(pb: Rc<Pocketbase>, on_login_event: Callback<Pocketbase>) -> Ht
     };
 
     html! {
+        <div class="centerContainer">
         <form {onsubmit} class="authForm">
             <h3>{"Login"}</h3>
             <input placeholder="Email" autocomplete={"username"} id={"username"} name={"username"} oninput={on_usernameinput} type="text" />
@@ -107,6 +108,7 @@ pub fn LoginForm(pb: Rc<Pocketbase>, on_login_event: Callback<Pocketbase>) -> Ht
                 <OAuth2Login pb={pb.clone()}/>
             </Suspense>
         </form>
+        </div>
     }
 }
 
@@ -176,6 +178,7 @@ pub fn SignUpForm(pb: Rc<Pocketbase>) -> Html {
         })
     };
     html! {
+        <div class="centerContainer">
         <form {onsubmit} class="authForm">
             <h3>{"Registro"}</h3>
             <input placeholder="Email" autocomplete={"username"} id={"email"} name={"email"} oninput={on_emailinput} type="text" />
@@ -184,6 +187,7 @@ pub fn SignUpForm(pb: Rc<Pocketbase>) -> Html {
             <input placeholder="Confirme sua Senha" autocomplete={"new-password"} id={"password_confirm"} name={"password_confirm"} oninput={on_passwordconfirminput} type="password" />
             <button type="submit">{"Registrar"} </button>
         </form>
+        </div>
     }
 }
 
@@ -217,7 +221,7 @@ pub fn RedirectOAuth(pb: Rc<Pocketbase>, on_login_event: Callback<Pocketbase>) -
     });
 
     match auth {
-        Ok(_) =>  html! {<p>{"Redirecting..."}</p>},
+        Ok(_) => html! {<p>{"Redirecting..."}</p>},
         Err(_) => html! {<p>{"Redirecting..."}</p>},
     }
 }

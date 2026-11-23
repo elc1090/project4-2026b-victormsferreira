@@ -249,6 +249,13 @@ impl Pocketbase {
 
 // Implementation of auth methods
 impl Pocketbase {
+    pub fn logout(&self) -> Self {
+        let _ = LocalStorage::set::<Option<AuthStore>>(STORAGE_KEY, None);
+        Self {
+            auth_store: None,
+            ..self.clone()
+        }
+    }
     pub async fn auth_with_password(
         &self,
         collection: &str,
