@@ -1,13 +1,14 @@
-body {
-    background-color: cadetblue;
-    display: flexbox;
-    align-items: center;
-    justify-content: center;
-    place-items: center;    
+html * {
     font-family: "Outfit", sans-serif;
     font-optical-sizing: auto;
     font-weight: 200;
     font-style: normal;
+}
+
+
+body {
+    background-color: cadetblue;
+    margin: 0px;
 }
 
 .authForm {
@@ -18,8 +19,9 @@ body {
     border-radius: 15px;
     background-color: aliceblue;
     padding: 16px 48px;
-
     margin: 8px;
+    width: auto;
+    height: auto;
 }
 .authForm input {
     width: 100%;
@@ -99,4 +101,43 @@ button:active {
     inline-size: 64px;
     block-size: 64px;
     scale: 0.1;
+}
+
+.centerContainer {
+    width: 100%;
+    height: 100%;
+    justify-content: center;
+    align-items: center;
+    place-items: center;
+}
+
+.headerBar {
+    list-style-type: none;
+    margin: 0;
+    padding: 0;
+    background-color: blueviolet;
+    display: flex;
+    flex-direction: row;
+    position: sticky;
+    top: 0;
+    justify-content: space-between;
+}
+
+.headerBar > li:hover {
+    background-color: antiquewhite;
+}
+
+.headerBar > li * {
+    display: block;
+    color: aliceblue;
+    text-decoration: none;
+    padding: 16px;
+}
+.headerBar > li {
+    border-right: 2px solid;
+    border-color: aliceblue;
+}
+
+.headerBar > li:last-child {
+  border-right: none;
 }
