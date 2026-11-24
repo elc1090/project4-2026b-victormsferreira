@@ -10,6 +10,8 @@ mod auth;
 use auth::{LoginForm, RedirectOAuth, SignUpForm};
 mod header;
 use gloo_console::log;
+mod game;
+use game::Game;
 
 use header::Header;
 #[autoprops]
@@ -84,6 +86,9 @@ fn App() -> Html {
                 Route::User { id } => {
                     html! {<p> {id}</p>}
                 }
+                Route::Game => {
+                    html! {<Game pb={Rc::clone(&pb)}/>}
+                }
             }
         })
     };
@@ -120,6 +125,9 @@ enum Route {
 
     #[at("/user/:id")]
     User { id: String },
+
+    #[at("/game")]
+    Game,
 }
 
 fn main() {

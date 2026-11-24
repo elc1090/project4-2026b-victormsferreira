@@ -18,15 +18,6 @@ struct LoginInfo {
 
 #[autoprops]
 #[component]
-fn ProviderLogo(logo: AttrValue) -> Html {
-    let parsed = Html::from_html_unchecked(logo);
-    html! {
-        {parsed}
-    }
-}
-
-#[autoprops]
-#[component]
 fn OAuth2Login(pb: Rc<Pocketbase>) -> HtmlResult {
     let auth_methods = {
         let pb = Rc::clone(&pb);
