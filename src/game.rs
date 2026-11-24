@@ -1,17 +1,12 @@
-use crate::game;
 use crate::pb::Pocketbase;
-use gloo_console::log;
 use gloo_render::AnimationFrame;
 use gloo_render::request_animation_frame;
 use std::cell::RefCell;
 use std::rc::Rc;
 use wasm_bindgen::JsCast;
-use wasm_bindgen::prelude::*;
-use web_sys::window;
 use web_sys::{CanvasRenderingContext2d as Canvas, HtmlCanvasElement};
 use yew::{Callback, prelude::*};
 use yew_autoprops::autoprops;
-use yew_router::prelude::*;
 
 struct GameState {
     canvas: Option<Canvas>,
@@ -45,7 +40,7 @@ impl GameState {
             }
         };
         *frame_handler.borrow_mut() = Some(request_animation_frame(cb));
-    }
+    }   
 }
 
 #[autoprops]
