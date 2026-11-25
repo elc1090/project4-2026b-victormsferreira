@@ -86,8 +86,8 @@ fn App() -> Html {
                 Route::User { id } => {
                     html! {<p> {id}</p>}
                 }
-                Route::Game => {
-                    html! {<Game pb={Rc::clone(&pb)}/>}
+                Route::Game { level } => {
+                    html! {<Game pb={Rc::clone(&pb)} level_id={level}/>}
                 }
             }
         })
@@ -115,9 +115,9 @@ fn Router() -> Html {
 enum Route {
     #[at("/")]
     Home,
-    #[at("/Login")]
+    #[at("/login")]
     Login,
-    #[at("/SignUp")]
+    #[at("/signUp")]
     SignUp,
 
     #[at("/oauth/redirect")]
@@ -126,8 +126,8 @@ enum Route {
     #[at("/user/:id")]
     User { id: String },
 
-    #[at("/game")]
-    Game,
+    #[at("/play/:level")]
+    Game { level: String },
 }
 
 fn main() {

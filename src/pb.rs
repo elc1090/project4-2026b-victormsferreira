@@ -238,11 +238,7 @@ impl Pocketbase {
         Self {
             addr: addr.to_string(),
             //client: Client::new(),
-            auth_store: if let Ok(stored) = LocalStorage::get::<AuthStore>(STORAGE_KEY) {
-                Some(stored)
-            } else {
-                None
-            },
+            auth_store: LocalStorage::get::<AuthStore>(STORAGE_KEY).ok(),
         }
     }
 }

@@ -157,11 +157,11 @@ checksum = "d15282ece24eaf4bd338d73ef580c6714c8615155c4190c781290ee3fa0fd372"
 dependencies = [
  "gloo-console 0.3.0",
  "gloo-dialogs",
- "gloo-events",
+ "gloo-events 0.2.0",
  "gloo-file",
  "gloo-history",
  "gloo-net 0.5.0",
- "gloo-render",
+ "gloo-render 0.2.0",
  "gloo-storage 0.3.0",
  "gloo-timers",
  "gloo-utils 0.2.0",
@@ -215,13 +215,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "gloo-events"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5d378d6dc490f9f6ea823f9eced8d2eb2bc410ce75e56f63e13f5ac9cc70b091"
+dependencies = [
+ "wasm-bindgen",
+ "web-sys",
+]
+
+[[package]]
 name = "gloo-file"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "97563d71863fb2824b2e974e754a81d19c4a7ec47b09ced8a0e6656b6d54bd1f"
 dependencies = [
  "futures-channel",
- "gloo-events",
+ "gloo-events 0.2.0",
  "js-sys",
  "wasm-bindgen",
  "web-sys",
@@ -234,7 +244,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "903f432be5ba34427eac5e16048ef65604a82061fe93789f2212afc73d8617d6"
 dependencies = [
  "getrandom",
- "gloo-events",
+ "gloo-events 0.2.0",
  "gloo-utils 0.2.0",
  "serde",
  "serde-wasm-bindgen",
@@ -291,6 +301,16 @@ name = "gloo-render"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "56008b6744713a8e8d98ac3dcb7d06543d5662358c9c805b4ce2167ad4649833"
+dependencies = [
+ "wasm-bindgen",
+ "web-sys",
+]
+
+[[package]]
+name = "gloo-render"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "db308ffef93591a2e1ebe14469c15f565e267cb46b1686eadc2030fd7ba26064"
 dependencies = [
  "wasm-bindgen",
  "web-sys",
@@ -610,7 +630,9 @@ name = "project4"
 version = "0.1.0"
 dependencies = [
  "gloo-console 0.4.1",
+ "gloo-events 0.3.1",
  "gloo-net 0.7.0",
+ "gloo-render 0.3.1",
  "gloo-storage 0.4.1",
  "implicit-clone",
  "serde",

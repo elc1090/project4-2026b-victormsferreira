@@ -25,7 +25,7 @@ fn OAuth2Login(pb: Rc<Pocketbase>) -> HtmlResult {
     };
     const REDIRECT_URL: &str = "http://127.0.0.1:8080/oauth/redirect";
 
-    match &*&auth_methods {
+    match &auth_methods {
         Ok(auths) => Ok(html! {
             for provider in &auths.oauth2.providers {
                 <button type="button" onclick={
@@ -33,8 +33,8 @@ fn OAuth2Login(pb: Rc<Pocketbase>) -> HtmlResult {
                     let verifier = provider.code_verifier.clone();
                     let url = format!("{}{}", provider.auth_url, REDIRECT_URL);
                     Callback::from(move |_| {
-                        let _ = LocalStorage::set("ProviderName", &name).unwrap();
-                        let _ = LocalStorage::set("CodeVerifier", &verifier).unwrap();
+                        LocalStorage::set("ProviderName", &name).unwrap();
+                        LocalStorage::set("CodeVerifier", &verifier).unwrap();
                         let window = window().unwrap();
                         log!(&url);
                         window.document().unwrap().location().unwrap().set_href(&url).unwrap();
@@ -59,10 +59,11 @@ pub fn LoginForm(pb: Rc<Pocketbase>, on_login_event: Callback<Pocketbase>) -> Ht
         let pb = pb.clone();
         let on_login_event = on_login_event.clone();
         use_async(async move {
-            Ok(on_login_event.emit(
+            on_login_event.emit(
                 pb.auth_with_password("users", &login_info.username, &login_info.password)
                     .await,
-            ))
+            );
+            Ok(())
         })
     };
     let onsubmit = {
@@ -123,10 +124,9 @@ pub fn SignUpForm(pb: Rc<Pocketbase>) -> Html {
         let signup_info = signup_info.clone();
         let pb = pb.clone();
         use_async(async move {
-            Ok({
-                let _ = pb.create("users", &*(signup_info)).await;
-                navigator.push(&Route::Login);
-            })
+            let _ = pb.create("users", &*(signup_info)).await;
+            navigator.push(&Route::Login);
+            Ok(())
         })
     };
     let onsubmit = {

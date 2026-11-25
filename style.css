@@ -3,12 +3,16 @@ html * {
     font-optical-sizing: auto;
     font-weight: 200;
     font-style: normal;
+    height: 100%;
+
 }
 
 
 body {
     background-color: cadetblue;
     margin: 0px;
+    height: 100%;
+
 }
 
 .authForm {
@@ -104,11 +108,11 @@ button:active {
 }
 
 .centerContainer {
-    width: 100%;
-    height: 100%;
     justify-content: center;
     align-items: center;
     place-items: center;
+    display: flex;
+    flex-flow: column;
 }
 
 .headerBar {
@@ -136,8 +140,31 @@ button:active {
 .headerBar > li {
     border-right: 2px solid;
     border-color: aliceblue;
+    transition: 100ms;
+
 }
 
 .headerBar > li:last-child {
   border-right: none;
+}
+
+canvas {
+    width: 960px;
+    height: 720px;
+    image-rendering: pixelated;
+}
+
+.loadingText {
+    color: white;
+    font-weight: bolder;
+    position: fixed;
+    translate: 0 45%;
+    animation: bouncyText 3s ease-in-out infinite;
+}
+
+@keyframes bouncyText {
+  0% { scale: 1.0; }
+  25% { scale: 1.1; }
+  75% { scale: 0.9; }
+  100% { scale: 1.; }
 }
