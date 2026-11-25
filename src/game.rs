@@ -3,8 +3,10 @@ use crate::pb::Pocketbase;
 use gloo_console::log;
 use gloo_render::AnimationFrame;
 use gloo_render::request_animation_frame;
+use hecs::*;
 use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::rc::Rc;
 use wasm_bindgen::JsCast;
 use web_sys::HtmlElement;
@@ -16,24 +18,10 @@ use yew_router::prelude::*;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
-struct LevelData {
-    tiles: Vec<u32>,
-    player_spawn: (i32, i32),
-}
-#[derive(Serialize, Deserialize, Debug, Clone)]
-#[serde(rename_all = "camelCase")]
 struct GameLevel {
     name: String,
     author: String,
-    width: u32,
-    height: u32,
-    data: LevelData,
-}
-
-trait GameObject {
-    fn update(&mut self, dt: f64);
-
-    fn draw(&self, game_state: &GameState);
+    data: String,
 }
 
 #[repr(usize)]
@@ -42,180 +30,242 @@ enum Input {
     Right,
     Up,
     Down,
-    Max,
 }
 
-#[derive(Default, Clone)]
-struct InputSystem {
-    inputs_prev: [bool; Input::Max as usize],
-    inputs: [bool; Input::Max as usize],
-    mouse: (i32, i32),
+struct TilePos {
+    x: i32,
+    y: i32,
 }
 
-impl InputSystem {
-    fn update_prev(&mut self) {
-        self.inputs_prev = self.inputs;
-    }
-    fn input_down(&self, input: Input) -> bool {
-        self.inputs[input as usize]
-    }
-    fn input_pressed(&self, input: Input) -> bool {
-        let input = input as usize;
-        self.inputs[input] && !self.inputs_prev[input]
-    }
-    fn input_released(&self, input: Input) -> bool {
-        let input = input as usize;
-        !self.inputs[input] && self.inputs_prev[input]
-    }
-
-    fn input_axis(&self, neg: Input, pos: Input) -> f64 {
-        (if self.inputs[pos as usize] { 1.0 } else { 0.0 })
-            - (if self.inputs[neg as usize] { 1.0 } else { 0.0 })
-    }
-    pub fn on_input_down(&mut self, input: Input) {
-        self.inputs[input as usize] = true;
-    }
-    pub fn on_input_up(&mut self, input: Input) {
-        self.inputs[input as usize] = false;
-    }
+struct Sprite {
+    id: i32,
+    prio: u8,
+    render_pos: (f64, f64),
 }
 
-#[derive(Default)]
-enum PlayerAnim {
-    #[default]
-    Idle,
-    Walk {
-        left: bool,
-        frame: i32,
-    },
-    Jump {
-        left: bool,
-    },
-}
-#[derive(Default)]
-struct Player {
-    input_state: InputSystem,
-    x: f64,
-    y: f64,
-    vel_x: f64,
-    vel_y: f64,
-    anim: PlayerAnim,
-    flip: bool,
-    anim_time: f64,
-    jump_buffer: f64,
-    coyote_time: f64,
-}
-impl GameObject for Player {
-    fn update(&mut self, dt: f64) {
-        const GRAVITY: f64 = 1024.0;
-        const MAX_SPEED: f64 = 150.0;
-        const ACCEL: f64 = 1024.0;
-        const DECCEL: f64 = 0.85;
-        const JUMP_SPEED: f64 = 250.0;
-        const JUMP_GRAVITY: f64 = 512.0;
-        let accel = self.input_state.input_axis(Input::Left, Input::Right);
-        self.anim_time += dt;
-        self.x += self.vel_x * dt / 2.0;
-        self.y += self.vel_y * dt / 2.0;
-        if self.jump_buffer > 0.0 {
-            self.jump_buffer -= dt;
-        }
-
-        if self.input_state.input_pressed(Input::Up) {
-            self.jump_buffer = 0.2;
-        }
-
-        if accel != 0.0 {
-            self.vel_x += ACCEL * accel * dt;
-            if self.vel_x < -MAX_SPEED {
-                self.vel_x = -MAX_SPEED;
-            } else if self.vel_x > MAX_SPEED {
-                self.vel_x = MAX_SPEED;
-            }
-            self.flip = self.vel_x < 0.0;
-        } else {
-            self.vel_x *= DECCEL;
-        }
-        if self.y < 240.0 {
-            if self.vel_y < 0.0 && self.input_state.input_down(Input::Up) {
-                self.vel_y += JUMP_GRAVITY * dt;
-            } else {
-                self.vel_y += GRAVITY * dt;
-            }
-        } else {
-            self.y = 240.0;
-            self.coyote_time = 0.15;
-            if self.vel_y > 0.0 {
-                self.vel_y = 0.0;
-            }
-        }
-        if self.vel_y < 0.0 && self.input_state.input_released(Input::Up) {
-            self.vel_y *= 0.5;
-        }
-        if self.coyote_time > 0.0 && self.jump_buffer > 0.0 {
-            self.vel_y = -JUMP_SPEED;
-            self.jump_buffer = -1.0;
-            self.coyote_time = -1.0;
-        }
-
-        self.anim = if self.vel_y < 0.0 {
-            PlayerAnim::Jump { left: self.flip }
-        } else if self.vel_x < -10.0 {
-            PlayerAnim::Walk {
-                left: true,
-                frame: (self.anim_time * 10.0) as i32,
-            }
-        } else if self.vel_x > 10.0 {
-            PlayerAnim::Walk {
-                left: false,
-                frame: (self.anim_time * 10.0) as i32,
-            }
-        } else {
-            PlayerAnim::Idle
-        };
-
-        self.x += self.vel_x * dt / 2.0;
-        self.y += self.vel_y * dt / 2.0;
-    }
-    fn draw(&self, game_state: &GameState) {
-        let spr = match self.anim {
-            PlayerAnim::Idle => 280,
-            PlayerAnim::Jump { left } => {
-                if left {
-                    304
-                } else {
-                    284
-                }
-            }
-            PlayerAnim::Walk { left, frame } => {
-                if left {
-                    301 + frame % 3
-                } else {
-                    281 + frame % 3
-                }
-            }
-        };
-        game_state.sprite(spr, self.x as i32 + 8, self.y as i32 - 16);
-    }
-}
+struct Wall {}
+struct Player {}
+struct Moving {}
+struct Box {}
+struct Target {}
 
 struct GameState {
     img: Option<HtmlImageElement>,
     canvas: Option<Canvas>,
     level: Option<GameLevel>,
-    player: Player,
-    input: InputSystem,
+    world: hecs::World,
+    level_size: (u32, u32),
+    level_complete: bool,
+    cam_pos: (i32, i32),
 }
 
+fn lerp(a: f64, b: f64, t: f64) -> f64 {
+    a + (b - a) * t
+}
 impl GameState {
-    pub fn on_update(&mut self, dt: f64) {
-        self.player.input_state = self.input.clone();
-        self.player.update(dt);
-        self.input.update_prev();
+    pub fn restart(&mut self) {
+        self.world.clear();
+        self.parse_level();
+        self.level_complete = false;
     }
-    pub fn on_draw(&self) {
+    fn move_objects(&mut self, input: Input) {
+        let mut to_move: Vec<(Entity, &Input)> = Vec::new();
+
+        let moving: HashMap<(i32, i32), Entity> = self
+            .world
+            .query::<(Entity, &TilePos, &Moving)>()
+            .iter()
+            .map(|t| ((t.1.x, t.1.y), t.0))
+            .collect::<HashMap<_, _>>();
+        let walls: HashMap<(i32, i32), Entity> = self
+            .world
+            .query::<(Entity, &TilePos, &Wall)>()
+            .iter()
+            .map(|t| ((t.1.x, t.1.y), t.0))
+            .collect::<HashMap<_, _>>();
+
+        for (position, _player) in self.world.query::<(&TilePos, &Player)>().iter() {
+            let (start, end, is_x) = match &input {
+                Input::Up => (position.y, 0, false),
+                Input::Down => (position.y, (self.level_size.1 - 1) as i32, false),
+                Input::Left => (position.x, 0, true),
+                Input::Right => (position.x, (self.level_size.0 - 1) as i32, true),
+            };
+
+            let range = if start < end {
+                (start..=end).collect::<Vec<_>>()
+            } else {
+                (end..=start).rev().collect::<Vec<_>>()
+            };
+            for p in range {
+                let pos = if is_x {
+                    (p, position.y)
+                } else {
+                    (position.x, p)
+                };
+                match moving.get(&pos) {
+                    Some(b) => {
+                        to_move.push((*b, &input));
+                    }
+                    None => match walls.get(&pos) {
+                        Some(_) => {
+                            to_move.clear();
+                        }
+                        None => break,
+                    },
+                }
+            }
+        }
+        for (e, input) in to_move {
+            let mut position = self.world.get::<&mut TilePos>(e).unwrap();
+            match input {
+                Input::Up => position.y -= 1,
+                Input::Down => position.y += 1,
+                Input::Left => position.x -= 1,
+                Input::Right => position.x += 1,
+            }
+        }
+    }
+
+    fn check_for_solution(&mut self) -> bool {
+        let boxes: Vec<(i32, i32)> = self
+            .world
+            .query::<(Entity, &TilePos, &Box)>()
+            .iter()
+            .map(|t| (t.1.x, t.1.y))
+            .collect::<Vec<_>>();
+
+        for (position, _target) in self.world.query::<(&TilePos, &Target)>().iter() {
+            let mut satisfied = false;
+            for box_pos in &boxes {
+                if box_pos.0 == position.x && box_pos.1 == position.y {
+                    satisfied = true;
+                    break;
+                }
+            }
+            if !satisfied {
+                return false;
+            }
+        }
+        true
+    }
+    pub fn on_input_down(&mut self, input: Input) {
+        if !self.level_complete {
+            self.move_objects(input);
+            self.level_complete = self.check_for_solution();
+        }
+    }
+
+    pub fn spawn_box(&mut self, x: i32, y: i32) {
+        self.world.spawn((
+            TilePos { x, y },
+            Sprite {
+                id: 3,
+                prio: 128,
+                render_pos: (x as f64 * 16.0, y as f64 * 16.0),
+            },
+            Moving {},
+            Box {},
+        ));
+    }
+    pub fn spawn_grass(&mut self, x: i32, y: i32) {
+        self.world.spawn((
+            TilePos { x, y },
+            Sprite {
+                id: 0,
+                prio: 0,
+                render_pos: (x as f64 * 16.0, y as f64 * 16.0),
+            },
+        ));
+    }
+    pub fn spawn_wall(&mut self, x: i32, y: i32) {
+        self.world.spawn((
+            TilePos { x, y },
+            Sprite {
+                id: 1,
+                prio: 1,
+                render_pos: (x as f64 * 16.0, y as f64 * 16.0),
+            },
+            Wall {},
+        ));
+    }
+    pub fn spawn_player(&mut self, x: i32, y: i32) {
+        self.world.spawn((
+            TilePos { x, y },
+            Sprite {
+                id: 2,
+                prio: 255,
+                render_pos: (x as f64 * 16.0, y as f64 * 16.0),
+            },
+            Player {},
+            Moving {},
+        ));
+    }
+    pub fn spawn_target(&mut self, x: i32, y: i32) {
+        self.world.spawn((
+            TilePos { x, y },
+            Sprite {
+                id: 4,
+                prio: 64,
+                render_pos: (x as f64 * 16.0, y as f64 * 16.0),
+            },
+            Target {},
+        ));
+    }
+
+    pub fn parse_level(&mut self) {
+        if let Some(level) = &self.level.clone() {
+            let mut w = 0;
+            let mut x = 0;
+            let mut y = 0;
+            for i in level.data.chars() {
+                match i {
+                    '.' => self.spawn_grass(x, y),
+                    '#' => self.spawn_wall(x, y),
+                    '@' => {
+                        self.spawn_grass(x, y);
+                        self.spawn_player(x, y);
+                    }
+                    'B' => {
+                        self.spawn_grass(x, y);
+                        self.spawn_box(x, y);
+                    }
+                    'T' => {
+                        self.spawn_grass(x, y);
+                        self.spawn_target(x, y);
+                    }
+                    '\n' => {
+                        w = w.max(x);
+                        x = -1;
+                        y += 1;
+                    }
+                    _ => {}
+                }
+
+                x += 1;
+            }
+            self.level_size = (w as u32, (y + 1) as u32);
+            self.cam_pos.0 = (self.level_size.0 * 8) as i32;
+            self.cam_pos.1 = (self.level_size.1 * 8) as i32;
+        }
+    }
+    pub fn on_draw(&mut self) {
         self.clear();
-        self.player.draw(self);
+        let mut draw_queue = vec![];
+        for (position, tile) in self.world.query_mut::<(&TilePos, &mut Sprite)>() {
+            tile.render_pos.0 = lerp(tile.render_pos.0, (position.x * 16) as f64, 0.25);
+            tile.render_pos.1 = lerp(tile.render_pos.1, (position.y * 16) as f64, 0.25);
+            draw_queue.push((
+                tile.id,
+                tile.render_pos.0 as i32,
+                tile.render_pos.1 as i32,
+                tile.prio,
+            ));
+        }
+        draw_queue.sort_by_key(|v| v.3);
+        for v in draw_queue {
+            self.sprite(v.0, v.1, v.2);
+        }
     }
     pub fn sprite(&self, spr: i32, x: i32, y: i32) {
         if let Some(img) = &self.img
@@ -226,8 +276,8 @@ impl GameState {
             let sy = (TILE_SIZE * (spr / 20)) as f64;
             let sw = TILE_SIZE as f64;
             let sh = TILE_SIZE as f64;
-            let dx = x as f64;
-            let dy = y as f64;
+            let dx = (x - self.cam_pos.0 + 160) as f64;
+            let dy = (y - self.cam_pos.1 + 120) as f64;
             let dw = TILE_SIZE as f64;
             let dh = TILE_SIZE as f64;
 
@@ -247,10 +297,6 @@ impl GameState {
             canvas.set_fill_style_str("rgb(255, 255, 255)");
         }
     }
-    pub fn tile(&self, spr: i32, x: i32, y: i32) {
-        const TILE_SIZE: i32 = 16;
-        self.sprite(spr, x * TILE_SIZE, y * TILE_SIZE);
-    }
     async fn load_level_by_id(pb: Rc<Pocketbase>, level_id: &str) -> Option<GameLevel> {
         if let Ok(level_record) = pb.view::<GameLevel>("levels", level_id).await {
             log!(&level_record.item.name);
@@ -261,13 +307,11 @@ impl GameState {
     }
     fn game_tick(
         game_state: Rc<RefCell<GameState>>,
-        t_a: f64,
+        _t_a: f64,
         t_b: f64,
         frame_handler: Rc<RefCell<Option<AnimationFrame>>>,
     ) {
-        let dt = (t_b - t_a) / 1000.0;
-        game_state.borrow_mut().on_update(dt);
-        game_state.borrow().on_draw();
+        game_state.borrow_mut().on_draw();
         let cb = {
             let frame_handler = frame_handler.clone();
             move |t| {
@@ -299,8 +343,10 @@ pub fn Game(pb: Rc<Pocketbase>, level_id: AttrValue) -> Html {
         img: None,
         canvas: None,
         level: None,
-        player: Default::default(),
-        input: Default::default(),
+        world: World::new(),
+        level_size: (0, 0),
+        cam_pos: (0, 0),
+        level_complete: false,
     });
     let frame_handler: Rc<RefCell<Option<AnimationFrame>>> = use_mut_ref(|| None);
     let author_name = {
@@ -311,6 +357,7 @@ pub fn Game(pb: Rc<Pocketbase>, level_id: AttrValue) -> Html {
             if let Some(level) = level {
                 let author = pb.view::<User>("users", &level.author).await;
                 game_state.borrow_mut().level = Some(level);
+                game_state.borrow_mut().parse_level();
                 Some(author.unwrap().item.name.clone())
             } else {
                 navigator.push(&Route::Home);
@@ -364,46 +411,13 @@ pub fn Game(pb: Rc<Pocketbase>, level_id: AttrValue) -> Html {
             e.prevent_default();
             if !e.repeat() {
                 match e.key().as_str() {
-                    "w" => game_state.borrow_mut().input.on_input_down(Input::Up),
-                    "s" => game_state.borrow_mut().input.on_input_down(Input::Down),
-                    "a" => game_state.borrow_mut().input.on_input_down(Input::Left),
-                    "d" => game_state.borrow_mut().input.on_input_down(Input::Right),
+                    "ArrowUp" => game_state.borrow_mut().on_input_down(Input::Up),
+                    "ArrowDown" => game_state.borrow_mut().on_input_down(Input::Down),
+                    "ArrowLeft" => game_state.borrow_mut().on_input_down(Input::Left),
+                    "ArrowRight" => game_state.borrow_mut().on_input_down(Input::Right),
+                    "r" => game_state.borrow_mut().restart(),
                     _ => (),
                 }
-            }
-        })
-    };
-    let onkeyup = {
-        let game_state = game_state.clone();
-        Callback::from(move |e: KeyboardEvent| {
-            e.prevent_default();
-            if !e.repeat() {
-                match e.key().as_str() {
-                    "w" => game_state.borrow_mut().input.on_input_up(Input::Up),
-                    "s" => game_state.borrow_mut().input.on_input_up(Input::Down),
-                    "a" => game_state.borrow_mut().input.on_input_up(Input::Left),
-                    "d" => game_state.borrow_mut().input.on_input_up(Input::Right),
-                    _ => (),
-                }
-            }
-        })
-    };
-    let onmousemove = {
-        let game_state = game_state.clone();
-        Callback::from(move |e: MouseEvent| {
-            e.prevent_default();
-            let x = e.x();
-            let y = e.y();
-            let target = e.target().unwrap().dyn_into::<HtmlCanvasElement>().ok();
-            if let Some(target) = target {
-                let dom_rect = target.get_bounding_client_rect();
-                let x = x as f64 - dom_rect.x();
-                let y = y as f64 - dom_rect.y();
-                let xr = x / dom_rect.width();
-                let yr = y / dom_rect.height();
-                let xo = (xr * 320.0) as i32;
-                let yo = (yr * 240.0) as i32;
-                game_state.borrow_mut().input.mouse = (xo, yo);
             }
         })
     };
@@ -423,7 +437,7 @@ pub fn Game(pb: Rc<Pocketbase>, level_id: AttrValue) -> Html {
     html! {
         <>
         <div class="centerContainer" style="margin: 2%;">
-        <canvas tabindex="0" {onkeydown} {onkeyup} {onmousemove} id="gameCanvas" width="320" height="240" ref={canvas_ref} />
+        <canvas tabindex="0" {onkeydown} id="gameCanvas" width="320" height="240" ref={canvas_ref} />
         if let Ok(author_name) = author_name {
             <div style="display: flex; gap: 0px; flex-direction: column; justify-content: center; align-items: center">
             <h1 style="margin: 16px;">{game_state.borrow().level.clone().unwrap().name}</h1>
