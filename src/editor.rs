@@ -10,7 +10,7 @@ use wasm_bindgen::JsCast;
 use web_sys::HtmlElement;
 use web_sys::window;
 use web_sys::{
-    CanvasRenderingContext2d as Canvas, HtmlCanvasElement, HtmlImageElement, HtmlInputElement
+    CanvasRenderingContext2d as Canvas, HtmlCanvasElement, HtmlImageElement, HtmlInputElement,
 };
 use yew::{prelude::*, suspense::use_future};
 use yew_autoprops::autoprops;
@@ -59,14 +59,13 @@ impl EditorState {
             && self.mouse_pos.0 < 20
             && self.mouse_pos.1 >= 0
             && self.mouse_pos.1 < 15
+            && left
         {
-            if left {
-                if right {
-                    self.tiles[self.mouse_pos.0 as usize][self.mouse_pos.1 as usize] = ' ';
-                } else {
-                    self.tiles[self.mouse_pos.0 as usize][self.mouse_pos.1 as usize] =
-                        self.current_tile;
-                }
+            if right {
+                self.tiles[self.mouse_pos.0 as usize][self.mouse_pos.1 as usize] = ' ';
+            } else {
+                self.tiles[self.mouse_pos.0 as usize][self.mouse_pos.1 as usize] =
+                    self.current_tile;
             }
         }
     }
@@ -155,8 +154,6 @@ impl EditorState {
         *frame_handler.borrow_mut() = Some(request_animation_frame(cb));
     }
 }
-
-  
 
 #[autoprops]
 #[component]
@@ -299,11 +296,11 @@ pub fn Editor(pb: Rc<Pocketbase>, level_id: Option<AttrValue>) -> Html {
         let name = editor_state.borrow().name.clone();
         let data = editor_state.borrow().build_data();
         let id = editor_state.borrow().id.clone();
-        use_async(async move {            
+        use_async(async move {
             let level = GameLevel {
-                name: name,
+                name,
                 author: pb.auth_store.clone().unwrap().record.id,
-                data: data,
+                data,
                 public: true,
             };
             if let Some(id) = id {
@@ -316,7 +313,6 @@ pub fn Editor(pb: Rc<Pocketbase>, level_id: Option<AttrValue>) -> Html {
                     });
                     Ok(())
                 } else {
-
                     Err(())
                 }
             }

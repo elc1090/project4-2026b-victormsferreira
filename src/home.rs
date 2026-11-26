@@ -15,21 +15,21 @@ pub fn Level(pb: Rc<Pocketbase>, level: &Record<GameLevel>) -> Html {
     let navigator = use_navigator().unwrap();
     let onclick = {
         let navigator = navigator.clone();
-        let id = (&level).id.clone();
+        let id = level.id.clone();
         Callback::from(move |_: MouseEvent| {
             navigator.push(&Route::Game { level: id.clone() });
         })
     };
     let author_onclick = {
         let navigator = navigator.clone();
-        let id = (&level).item.author.clone();
+        let id = level.item.author.clone();
         Callback::from(move |_: MouseEvent| {
             navigator.push(&Route::User { id: id.clone() });
         })
     };
     let edit_onclick = {
         let navigator = navigator.clone();
-        let id = (&level).id.clone();
+        let id = level.id.clone();
         Callback::from(move |_: MouseEvent| {
             navigator.push(&Route::EditLevel { level: id.clone() });
         })
@@ -100,7 +100,7 @@ pub fn LevelFetcher(pb: Rc<Pocketbase>, page: usize) -> HtmlResult {
             </>
         }),
         Err(_) => Ok(html! {
-            <p>{format!("Error fetching levels")}</p>
+            <p>{"Error fetching levels"}</p>
         }),
     }
 }
@@ -136,7 +136,7 @@ pub fn UserLevelFetcher(pb: Rc<Pocketbase>, id: AttrValue, page: usize) -> HtmlR
             </>
         }),
         Err(_) => Ok(html! {
-            <p>{format!("Error fetching levels")}</p>
+            <p>{"Error fetching levels"}</p>
         }),
     }
 }

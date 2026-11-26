@@ -420,10 +420,8 @@ pub fn Game(pb: Rc<Pocketbase>, level_id: AttrValue) -> Html {
                     "ArrowLeft" => game_state.borrow_mut().on_input_down(Input::Left),
                     "ArrowRight" => game_state.borrow_mut().on_input_down(Input::Right),
                     "r" => game_state.borrow_mut().restart(),
-                    "x" => {
-                        if game_state.borrow().level_complete {
-                            navigator.push(&Route::Home);
-                        }
+                    "x" if game_state.borrow().level_complete => {
+                        navigator.push(&Route::Home);
                     }
                     _ => (),
                 }
