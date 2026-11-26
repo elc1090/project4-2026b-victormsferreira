@@ -3,13 +3,13 @@ use crate::pb::{OAuth2, Pocketbase};
 use gloo_console::log;
 use gloo_storage::{LocalStorage, Storage};
 use serde::{Deserialize, Serialize};
+use std::env;
 use std::rc::Rc;
 use web_sys::{HtmlInputElement, window};
 use yew::{Callback, prelude::*, suspense::use_future};
 use yew_autoprops::autoprops;
 use yew_hooks::*;
 use yew_router::hooks::{use_location, use_navigator};
-
 #[derive(Clone)]
 struct LoginInfo {
     username: String,
@@ -23,7 +23,8 @@ fn OAuth2Login(pb: Rc<Pocketbase>) -> HtmlResult {
         let pb = Rc::clone(&pb);
         use_future(|| async move { pb.list_auth_methods("users").await })
     };
-    const REDIRECT_URL: &str = "http://127.0.0.1:8080/oauth/redirect";
+    
+    let redirect_url : String = env::var("GOOGLE_AUTH_REDIRECT_URL").unwrap();
 
     match &auth_methods {
         Ok(auths) => Ok(html! {
@@ -31,7 +32,7 @@ fn OAuth2Login(pb: Rc<Pocketbase>) -> HtmlResult {
                 <button type="button" onclick={
                     let name = provider.name.clone();
                     let verifier = provider.code_verifier.clone();
-                    let url = format!("{}{}", provider.auth_url, REDIRECT_URL);
+                    let url = format!("{}{}", provider.auth_url, redirect_url);
                     Callback::from(move |_| {
                         LocalStorage::set("ProviderName", &name).unwrap();
                         LocalStorage::set("CodeVerifier", &verifier).unwrap();
@@ -194,7 +195,7 @@ pub fn RedirectOAuth(pb: Rc<Pocketbase>, on_login_event: Callback<Pocketbase>) -
     let location = use_location().unwrap();
     let provider = location.query::<RedirectOAuthParams>().unwrap();
     let auth = use_future(|| async move {
-        const REDIRECT_URL: &str = "http://127.0.0.1:8080/oauth/redirect";
+        let redirect_url : String = env::var("GOOGLE_AUTH_REDIRECT_URL").unwrap();
         log!(&provider.code);
         let provider_name: String = LocalStorage::get::<String>("ProviderName").unwrap();
         let provider_code: String = provider.code;
@@ -203,7 +204,7 @@ pub fn RedirectOAuth(pb: Rc<Pocketbase>, on_login_event: Callback<Pocketbase>) -
             provider: provider_name.clone(),
             code: provider_code.clone(),
             code_verifier: verifier.clone(),
-            redirect_URL: REDIRECT_URL.to_string(),
+            redirect_URL: redirect_url,
             create_data: None,
         };
         let pb = pb.auth_with_oauth2("users", &oauth).await;

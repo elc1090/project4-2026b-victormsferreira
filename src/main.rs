@@ -12,7 +12,7 @@ use game::Game;
 use gloo_console::log;
 use header::Header;
 use home::{Home, UserPage};
-use std::rc::Rc;
+use std::{env, rc::Rc};
 use web_sys::window;
 use yew::{Callback, prelude::*};
 use yew_autoprops::autoprops;
@@ -21,8 +21,9 @@ use yew_router::prelude::*;
 #[autoprops]
 #[component]
 fn App() -> Html {
+    let addr = env::var("POCKETBASE_URL").unwrap();
     let pb: UseStateHandle<Rc<Pocketbase>> =
-        use_state(|| Rc::new(Pocketbase::new("http://127.0.0.1:8090")));
+        use_state(|| Rc::new(Pocketbase::new(&addr)));
     let navigator = use_navigator().unwrap();
     let on_logout = {
         let pb = pb.clone();
