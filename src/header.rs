@@ -16,10 +16,11 @@ pub fn Header(pb: Rc<Pocketbase>, on_logout: Callback<()>) -> Html {
     html! {
         <ul class="headerBar">
             <ul class="headerBar">
-                <li class="floatLeft"><Link<Route> to={Route::Home}>{ "Projeto4" }</Link<Route>></li>
+                <li class="floatLeft"><Link<Route> to={Route::Home}>{ "Sokoban Maker" }</Link<Route>></li>
             </ul>
             <ul class="headerBar">
             if let Some(record) = authstore {
+                <li class="floatRight"><Link<Route> to={Route::Edit}>{ "Criar um Puzzle" }</Link<Route>></li>
                 <li class="floatRight"><Link<Route> to={Route::User { id: record.id.clone() }}>{ record.name.clone() }</Link<Route>></li>
                 <li class="floatRight"><a onclick={Callback::from(move |e: MouseEvent| { e.prevent_default(); on_logout.emit(())})}>{"Logout"}</a></li>
             } else  {

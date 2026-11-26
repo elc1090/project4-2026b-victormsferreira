@@ -1,37 +1,28 @@
+mod auth;
+mod editor;
+mod game;
+mod header;
+mod home;
 #[allow(dead_code)]
 mod pb;
-use crate::pb::Pocketbase;
+
+use crate::{editor::Editor, pb::Pocketbase};
+use auth::{LoginForm, RedirectOAuth, SignUpForm};
+use game::Game;
+use gloo_console::log;
+use header::Header;
+use home::{Home, UserPage};
 use std::rc::Rc;
 use web_sys::window;
 use yew::{Callback, prelude::*};
 use yew_autoprops::autoprops;
 use yew_router::prelude::*;
-mod auth;
-use auth::{LoginForm, RedirectOAuth, SignUpForm};
-mod header;
-use gloo_console::log;
-mod game;
-use game::Game;
-
-use header::Header;
-#[autoprops]
-#[component]
-fn Home(pb: Rc<Pocketbase>, username: AttrValue) -> Html {
-    html! {}
-}
 
 #[autoprops]
 #[component]
 fn App() -> Html {
     let pb: UseStateHandle<Rc<Pocketbase>> =
         use_state(|| Rc::new(Pocketbase::new("http://127.0.0.1:8090")));
-    let username: UseStateHandle<Option<String>> = use_state(|| {
-        if let Some(authstore) = Rc::clone(&pb).auth_store.clone() {
-            authstore.record.name.clone()
-        } else {
-            None
-        }
-    });
     let navigator = use_navigator().unwrap();
     let on_logout = {
         let pb = pb.clone();
@@ -63,32 +54,30 @@ fn App() -> Html {
 
         let pb = pb.clone();
 
-        Callback::from(move |route| {
-            let us = username.clone();
-            let username = if let Some(u) = &*us {
-                u.clone()
-            } else {
-                "No User".to_string()
-            };
-            match route {
-                Route::Home => {
-                    html! {<Home pb={Rc::clone(&pb)} username={username}/>}
-                }
-                Route::Login => {
-                    html! { <LoginForm pb={Rc::clone(&pb)} on_login_event={on_login.clone()} />}
-                }
-                Route::SignUp => {
-                    html! { <SignUpForm pb={Rc::clone(&pb)} />}
-                }
-                Route::RedirectOAuth => {
-                    html! {<RedirectOAuth pb={Rc::clone(&pb)} on_login_event={on_login.clone()}/>}
-                }
-                Route::User { id } => {
-                    html! {<p> {id}</p>}
-                }
-                Route::Game { level } => {
-                    html! {<Game pb={Rc::clone(&pb)} level_id={level}/>}
-                }
+        Callback::from(move |route| match route {
+            Route::Home => {
+                html! {<Home pb={Rc::clone(&pb)}/>}
+            }
+            Route::Login => {
+                html! { <LoginForm pb={Rc::clone(&pb)} on_login_event={on_login.clone()} />}
+            }
+            Route::SignUp => {
+                html! { <SignUpForm pb={Rc::clone(&pb)} />}
+            }
+            Route::RedirectOAuth => {
+                html! {<RedirectOAuth pb={Rc::clone(&pb)} on_login_event={on_login.clone()}/>}
+            }
+            Route::User { id } => {
+                html! {<UserPage pb={Rc::clone(&pb)} id={id} />}
+            }
+            Route::Game { level } => {
+                html! {<Game pb={Rc::clone(&pb)} level_id={level}/>}
+            }
+            Route::Edit => {
+                html! {<Editor pb={Rc::clone(&pb)} level_id={None}/>}
+            }
+            Route::EditLevel { level } => {
+                html! {<Editor pb={Rc::clone(&pb)} level_id={Some(level)}/>}
             }
         })
     };
@@ -128,6 +117,12 @@ enum Route {
 
     #[at("/play/:level")]
     Game { level: String },
+
+    #[at("/edit")]
+    Edit,
+
+    #[at("/edit/:level")]
+    EditLevel { level: String },
 }
 
 fn main() {

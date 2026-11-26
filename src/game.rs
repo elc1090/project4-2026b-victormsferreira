@@ -4,6 +4,7 @@ use gloo_console::log;
 use gloo_render::AnimationFrame;
 use gloo_render::request_animation_frame;
 use hecs::*;
+use implicit_clone::ImplicitClone;
 use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -16,12 +17,13 @@ use yew::{prelude::*, suspense::use_future};
 use yew_autoprops::autoprops;
 use yew_router::prelude::*;
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, ImplicitClone, PartialEq)]
 #[serde(rename_all = "camelCase")]
-struct GameLevel {
-    name: String,
-    author: String,
-    data: String,
+pub struct GameLevel {
+    pub name: String,
+    pub author: String,
+    pub data: String,
+    pub public: bool,
 }
 
 #[repr(usize)]
@@ -257,8 +259,8 @@ impl GameState {
             tile.render_pos.1 = lerp(tile.render_pos.1, (position.y * 16) as f64, 0.25);
             draw_queue.push((
                 tile.id,
-                tile.render_pos.0 as i32,
-                tile.render_pos.1 as i32,
+                tile.render_pos.0.round() as i32,
+                tile.render_pos.1.round() as i32,
                 tile.prio,
             ));
         }
@@ -272,8 +274,8 @@ impl GameState {
             && let Some(canvas) = &self.canvas
         {
             const TILE_SIZE: i32 = 16;
-            let sx = (TILE_SIZE * (spr % 20)) as f64;
-            let sy = (TILE_SIZE * (spr / 20)) as f64;
+            let sx = 0.0;
+            let sy = (TILE_SIZE * spr) as f64;
             let sw = TILE_SIZE as f64;
             let sh = TILE_SIZE as f64;
             let dx = (x - self.cam_pos.0 + 160) as f64;
@@ -326,11 +328,11 @@ impl GameState {
 
 #[derive(Default, Serialize, Deserialize, Clone, Debug, PartialEq)]
 #[serde(rename_all = "camelCase")]
-struct User {
-    email: String,
-    email_visibility: bool,
-    verified: bool,
-    name: String,
+pub struct User {
+    pub email: Option<String>,
+    pub email_visibility: bool,
+    pub verified: bool,
+    pub name: String,
 }
 
 #[autoprops]
@@ -350,6 +352,7 @@ pub fn Game(pb: Rc<Pocketbase>, level_id: AttrValue) -> Html {
     });
     let frame_handler: Rc<RefCell<Option<AnimationFrame>>> = use_mut_ref(|| None);
     let author_name = {
+        let navigator: Navigator = navigator.clone();
         let game_state = game_state.clone();
         let pb = pb.clone();
         use_future(|| async move {
@@ -407,6 +410,7 @@ pub fn Game(pb: Rc<Pocketbase>, level_id: AttrValue) -> Html {
     }
     let onkeydown = {
         let game_state = game_state.clone();
+        let navigator: Navigator = navigator.clone();
         Callback::from(move |e: KeyboardEvent| {
             e.prevent_default();
             if !e.repeat() {
@@ -416,6 +420,11 @@ pub fn Game(pb: Rc<Pocketbase>, level_id: AttrValue) -> Html {
                     "ArrowLeft" => game_state.borrow_mut().on_input_down(Input::Left),
                     "ArrowRight" => game_state.borrow_mut().on_input_down(Input::Right),
                     "r" => game_state.borrow_mut().restart(),
+                    "x" => {
+                        if game_state.borrow().level_complete {
+                            navigator.push(&Route::Home);
+                        }
+                    }
                     _ => (),
                 }
             }
