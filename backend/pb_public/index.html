@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta name="viewport" content="width=device-width, height=device-height, initial-scale=1, viewport-fit=cover">
+        <link rel="stylesheet" href="/style-8320097af31af270.css" integrity="sha384-ZyMwpxP8OHUi+qRUFSiDzHv7NvHkYRFAD3JNyIgorPBSB9iFrw56+S+lX3d8IqI5"/>
+        
+
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@100..900&display=swap" rel="stylesheet">
+    <link rel="modulepreload" href="/project4-6fe06f8eb210ef35.js" crossorigin="anonymous" integrity="sha384-LG64Ax5HgfkzB9rsaJvLFBetMtjL7ppvxN8WdD4OPmP3lZCq08h9Qm7YiieUqhHA"><link rel="preload" href="/project4-c70eff2c8e7ef96f_bg.wasm" crossorigin="anonymous" integrity="sha384-LeODcFTYqF8XKIJbHT2ZPX6QLTiydQCTnvzZRD4t30lkq7UnLpLmrhBZExQMSfhr" as="fetch" type="application/wasm"></head>
+    <body>
+<script type="module">
+import init, * as bindings from '/project4-6fe06f8eb210ef35.js';
+const wasm = await init({ module_or_path: '/project4-c70eff2c8e7ef96f_bg.wasm' });
+
+
+window.wasmBindings = bindings;
+
+
+dispatchEvent(new CustomEvent("TrunkApplicationStarted", {detail: {wasm}}));
+
+</script></body>
+</html>
