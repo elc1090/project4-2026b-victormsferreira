@@ -18,8 +18,8 @@ use yew::{Callback, prelude::*};
 use yew_autoprops::autoprops;
 use yew_router::prelude::*;
 
-const REDIRECT_URL: &str = "https://pocketbase-production-ae6fe236.up.railway.app/oauth/redirect";
-const PB_URL: &str = "https://pocketbase-production-ae6fe236.up.railway.app";
+const REDIRECT_URL: &str = "https://project4-2026b-victormsferreira-production.up.railway.app/oauth/redirect";
+const PB_URL: &str = "https://project4-2026b-victormsferreira-production.up.railway.app";
 
 
 #[autoprops]
