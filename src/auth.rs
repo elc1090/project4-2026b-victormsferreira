@@ -10,6 +10,7 @@ use yew::{Callback, prelude::*, suspense::use_future};
 use yew_autoprops::autoprops;
 use yew_hooks::*;
 use yew_router::hooks::{use_location, use_navigator};
+use crate::REDIRECT_URL;
 #[derive(Clone)]
 struct LoginInfo {
     username: String,
@@ -24,7 +25,6 @@ fn OAuth2Login(pb: Rc<Pocketbase>) -> HtmlResult {
         use_future(|| async move { pb.list_auth_methods("users").await })
     };
     
-    let redirect_url : String = env::var("GOOGLE_AUTH_REDIRECT_URL").unwrap();
 
     match &auth_methods {
         Ok(auths) => Ok(html! {
@@ -32,7 +32,7 @@ fn OAuth2Login(pb: Rc<Pocketbase>) -> HtmlResult {
                 <button type="button" onclick={
                     let name = provider.name.clone();
                     let verifier = provider.code_verifier.clone();
-                    let url = format!("{}{}", provider.auth_url, redirect_url);
+                    let url = format!("{}{}", provider.auth_url, REDIRECT_URL);
                     Callback::from(move |_| {
                         LocalStorage::set("ProviderName", &name).unwrap();
                         LocalStorage::set("CodeVerifier", &verifier).unwrap();
@@ -195,7 +195,6 @@ pub fn RedirectOAuth(pb: Rc<Pocketbase>, on_login_event: Callback<Pocketbase>) -
     let location = use_location().unwrap();
     let provider = location.query::<RedirectOAuthParams>().unwrap();
     let auth = use_future(|| async move {
-        let redirect_url : String = env::var("GOOGLE_AUTH_REDIRECT_URL").unwrap();
         log!(&provider.code);
         let provider_name: String = LocalStorage::get::<String>("ProviderName").unwrap();
         let provider_code: String = provider.code;
@@ -204,7 +203,7 @@ pub fn RedirectOAuth(pb: Rc<Pocketbase>, on_login_event: Callback<Pocketbase>) -
             provider: provider_name.clone(),
             code: provider_code.clone(),
             code_verifier: verifier.clone(),
-            redirect_URL: redirect_url,
+            redirect_URL: REDIRECT_URL.to_string(),
             create_data: None,
         };
         let pb = pb.auth_with_oauth2("users", &oauth).await;

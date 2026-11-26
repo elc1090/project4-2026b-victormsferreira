@@ -18,12 +18,15 @@ use yew::{Callback, prelude::*};
 use yew_autoprops::autoprops;
 use yew_router::prelude::*;
 
+const REDIRECT_URL: &str = "https://39e49w4oyjs58h8.pwz5.pocketbasecloud.com/oauth/redirect";
+const PB_URL: &str = "https://39e49w4oyjs58h8.pwz5.pocketbasecloud.com";
+
+
 #[autoprops]
 #[component]
 fn App() -> Html {
-    let addr = env::var("POCKETBASE_URL").unwrap();
     let pb: UseStateHandle<Rc<Pocketbase>> =
-        use_state(|| Rc::new(Pocketbase::new(&addr)));
+        use_state(|| Rc::new(Pocketbase::new(PB_URL)));
     let navigator = use_navigator().unwrap();
     let on_logout = {
         let pb = pb.clone();
